@@ -2,15 +2,17 @@ name: CI
 
 on:
   push:
-    tags: ['v*']
+    branches: [main, master]
   pull_request:
     branches: [main, master]
+  release:
+    types: [published]
 
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/brunoafk/recon-web
   NODE_VERSION: "24"
-  # aquasec/trivy 0.69.3 — pinned by digest, same image as .gitlab-ci.yml
+  # aquasec/trivy 0.69.3 — pinned by digest
   TRIVY_IMAGE: aquasec/trivy@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   TRIVY_SEVERITY_FS: CRITICAL,HIGH
   TRIVY_SEVERITY_IMAGE: CRITICAL
@@ -77,12 +79,61 @@ jobs:
             ${{ env.TRIVY_IMAGE }} \
             fs --severity ${TRIVY_SEVERITY_FS} --exit-code 1 --ignore-unfixed /src
 
-  # ── Stage 4: Build + Scan + Push (only on main) ────────────
-  docker-api:
-    name: Docker — API
+  # ── Stage 4: Docker Build + Trivy Scan (always after quality) ──
+  docker-build:
+    name: Docker Build & Scan
     needs: [lint, test, audit]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image: [api, web, cli]
+        include:
+          - image: api
+            dockerfile: packages/api/Dockerfile
+          - image: web
+            dockerfile: packages/web/Dockerfile
+          - image: cli
+            dockerfile: packages/cli/Dockerfile
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build ${{ matrix.image }} image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          load: true
+          tags: ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:ci-${{ github.run_id }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+      - name: Trivy scan ${{ matrix.image }} image
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            ${{ env.TRIVY_IMAGE }} \
+            image --severity ${TRIVY_SEVERITY_IMAGE} --exit-code 1 --ignore-unfixed \
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:ci-${{ github.run_id }}
+
+  # ── Stage 5: Push to registry (only on release) ────────────
+  docker-push:
+    name: Push Docker Images
+    needs: [docker-build]
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image: [api, web, cli]
+        include:
+          - image: api
+            dockerfile: packages/api/Dockerfile
+          - image: web
+            dockerfile: packages/web/Dockerfile
+          - image: cli
+            dockerfile: packages/cli/Dockerfile
     steps:
       - uses: actions/checkout@v5
 
@@ -96,129 +147,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build API image
+      - name: Build and push ${{ matrix.image }}
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: packages/api/Dockerfile
-          load: true
-          tags: ${{ env.IMAGE_PREFIX }}/api:build-${{ github.run_id }}
-          cache-from: type=gha,scope=api
-          cache-to: type=gha,mode=max,scope=api
-
-      - name: Trivy scan API image
-        run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            ${{ env.TRIVY_IMAGE }} \
-            image --severity ${TRIVY_SEVERITY_IMAGE} --exit-code 1 --ignore-unfixed \
-            ${{ env.IMAGE_PREFIX }}/api:build-${{ github.run_id }}
-
-      - name: Push API image
-        run: |
-          VERSION_TAG="${{ github.ref_name }}"
-          docker tag ${{ env.IMAGE_PREFIX }}/api:build-${{ github.run_id }} \
-                     ${{ env.IMAGE_PREFIX }}/api:${VERSION_TAG}
-          docker push ${{ env.IMAGE_PREFIX }}/api:${VERSION_TAG}
-          # Only tag :latest for stable releases (no alpha/beta/rc)
-          if [[ "${VERSION_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            docker tag ${{ env.IMAGE_PREFIX }}/api:build-${{ github.run_id }} \
-                       ${{ env.IMAGE_PREFIX }}/api:latest
-            docker push ${{ env.IMAGE_PREFIX }}/api:latest
-          fi
-
-  docker-web:
-    name: Docker — Web
-    needs: [lint, test, audit]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build Web image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: packages/web/Dockerfile
-          load: true
-          tags: ${{ env.IMAGE_PREFIX }}/web:build-${{ github.run_id }}
-          cache-from: type=gha,scope=web
-          cache-to: type=gha,mode=max,scope=web
-
-      - name: Trivy scan Web image
-        run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            ${{ env.TRIVY_IMAGE }} \
-            image --severity ${TRIVY_SEVERITY_IMAGE} --exit-code 1 --ignore-unfixed \
-            ${{ env.IMAGE_PREFIX }}/web:build-${{ github.run_id }}
-
-      - name: Push Web image
-        run: |
-          VERSION_TAG="${{ github.ref_name }}"
-          docker tag ${{ env.IMAGE_PREFIX }}/web:build-${{ github.run_id }} \
-                     ${{ env.IMAGE_PREFIX }}/web:${VERSION_TAG}
-          docker push ${{ env.IMAGE_PREFIX }}/web:${VERSION_TAG}
-          if [[ "${VERSION_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            docker tag ${{ env.IMAGE_PREFIX }}/web:build-${{ github.run_id }} \
-                       ${{ env.IMAGE_PREFIX }}/web:latest
-            docker push ${{ env.IMAGE_PREFIX }}/web:latest
-          fi
-
-  docker-cli:
-    name: Docker — CLI
-    needs: [lint, test, audit]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Build CLI image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: packages/cli/Dockerfile
-          load: true
-          tags: ${{ env.IMAGE_PREFIX }}/cli:build-${{ github.run_id }}
-          cache-from: type=gha,scope=cli
-          cache-to: type=gha,mode=max,scope=cli
-
-      - name: Trivy scan CLI image
-        run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            ${{ env.TRIVY_IMAGE }} \
-            image --severity ${TRIVY_SEVERITY_IMAGE} --exit-code 1 --ignore-unfixed \
-            ${{ env.IMAGE_PREFIX }}/cli:build-${{ github.run_id }}
-
-      - name: Push CLI image
-        run: |
-          VERSION_TAG="${{ github.ref_name }}"
-          docker tag ${{ env.IMAGE_PREFIX }}/cli:build-${{ github.run_id }} \
-                     ${{ env.IMAGE_PREFIX }}/cli:${VERSION_TAG}
-          docker push ${{ env.IMAGE_PREFIX }}/cli:${VERSION_TAG}
-          if [[ "${VERSION_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            docker tag ${{ env.IMAGE_PREFIX }}/cli:build-${{ github.run_id }} \
-                       ${{ env.IMAGE_PREFIX }}/cli:latest
-            docker push ${{ env.IMAGE_PREFIX }}/cli:latest
-          fi
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ github.event.release.tag_name }}
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:latest
+          cache-from: type=gha,scope=${{ matrix.image }}

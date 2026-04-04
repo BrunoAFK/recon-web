@@ -54,7 +54,7 @@ audit:
   script:
     - trivy fs --severity ${TRIVY_SEVERITY_FS} --exit-code 1 --ignore-unfixed .
 
-# ── Stage 4: Build Docker images ───────────────────────────────
+# ── Stage 4: Build + Trivy scan (always on main + tags) ────────
 
 .docker-build:
   stage: build
@@ -94,7 +94,7 @@ build-cli:
       - cli-image.tar
     expire_in: 1 hour
 
-# ── Stage 5: Trivy scan ───────────────────────────────────────
+# ── Stage 5: Trivy image scan ─────────────────────────────────
 
 .trivy-scan:
   stage: scan
@@ -123,7 +123,7 @@ scan-cli:
     - trivy image --input cli-image.tar --severity ${TRIVY_SEVERITY_IMAGE} --exit-code 1 --ignore-unfixed --format table
   allow_failure: false
 
-# ── Stage 6: Push (only on main/master) ───────────────────────
+# ── Stage 6: Push to registry (only on tag/release) ───────────
 
 .docker-push:
   stage: push
@@ -131,7 +131,7 @@ scan-cli:
   services:
     - docker:27-dind
   rules:
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
   before_script:
     - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
 
@@ -140,8 +140,9 @@ push-api:
   needs: [scan-api, build-api]
   script:
     - docker load < api-image.tar
+    - docker tag ${IMAGE_PREFIX}/api:${CI_COMMIT_SHA} ${IMAGE_PREFIX}/api:${CI_COMMIT_TAG}
     - docker tag ${IMAGE_PREFIX}/api:${CI_COMMIT_SHA} ${IMAGE_PREFIX}/api:latest
-    - docker push ${IMAGE_PREFIX}/api:${CI_COMMIT_SHA}
+    - docker push ${IMAGE_PREFIX}/api:${CI_COMMIT_TAG}
     - docker push ${IMAGE_PREFIX}/api:latest
 
 push-web:
@@ -149,8 +150,9 @@ push-web:
   needs: [scan-web, build-web]
   script:
     - docker load < web-image.tar
+    - docker tag ${IMAGE_PREFIX}/web:${CI_COMMIT_SHA} ${IMAGE_PREFIX}/web:${CI_COMMIT_TAG}
     - docker tag ${IMAGE_PREFIX}/web:${CI_COMMIT_SHA} ${IMAGE_PREFIX}/web:latest
-    - docker push ${IMAGE_PREFIX}/web:${CI_COMMIT_SHA}
+    - docker push ${IMAGE_PREFIX}/web:${CI_COMMIT_TAG}
     - docker push ${IMAGE_PREFIX}/web:latest
 
 push-cli:
@@ -158,6 +160,7 @@ push-cli:
   needs: [scan-cli, build-cli]
   script:
     - docker load < cli-image.tar
+    - docker tag ${IMAGE_PREFIX}/cli:${CI_COMMIT_SHA} ${IMAGE_PREFIX}/cli:${CI_COMMIT_TAG}
     - docker tag ${IMAGE_PREFIX}/cli:${CI_COMMIT_SHA} ${IMAGE_PREFIX}/cli:latest
-    - docker push ${IMAGE_PREFIX}/cli:${CI_COMMIT_SHA}
+    - docker push ${IMAGE_PREFIX}/cli:${CI_COMMIT_TAG}
     - docker push ${IMAGE_PREFIX}/cli:latest
