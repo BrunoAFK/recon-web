@@ -1,5 +1,6 @@
 import type { AnalysisHandler, HandlerMetadata, HandlerRegistryEntry } from './types.js';
 
+import { abuseIpdbHandler } from './handlers/abuse-ipdb.js';
 import { archivesHandler } from './handlers/archives.js';
 import { blockListsHandler } from './handlers/block-lists.js';
 import { carbonHandler } from './handlers/carbon.js';
@@ -22,7 +23,10 @@ import { rankHandler } from './handlers/rank.js';
 import { redirectsHandler } from './handlers/redirects.js';
 import { robotsTxtHandler } from './handlers/robots-txt.js';
 import { screenshotHandler } from './handlers/screenshot.js';
+import { seoHandler } from './handlers/seo.js';
 import { securityTxtHandler } from './handlers/security-txt.js';
+import { serverLocationHandler } from './handlers/server-location.js';
+import { sslLabsHandler } from './handlers/ssl-labs.js';
 import { sitemapHandler } from './handlers/sitemap.js';
 import { socialTagsHandler } from './handlers/social-tags.js';
 import { sslHandler } from './handlers/ssl.js';
@@ -32,9 +36,21 @@ import { threatsHandler } from './handlers/threats.js';
 import { tlsHandler } from './handlers/tls.js';
 import { traceRouteHandler } from './handlers/trace-route.js';
 import { txtRecordsHandler } from './handlers/txt-records.js';
+import { virusTotalHandler } from './handlers/virustotal.js';
 import { whoisHandler } from './handlers/whois.js';
+import { wordpressHandler } from './handlers/wordpress.js';
 
 export const registry: Record<string, HandlerRegistryEntry> = {
+  'abuse-ipdb': {
+    handler: abuseIpdbHandler,
+    metadata: {
+      name: 'abuse-ipdb',
+      description: 'Check the server IP against AbuseIPDB for reported malicious activity, abuse confidence score, and reputation data.',
+      category: 'security',
+      requiresApiKey: ['ABUSEIPDB_API_KEY'],
+      requires: ['dns', 'http'],
+    },
+  },
   dns: {
     handler: dnsHandler,
     metadata: {
@@ -207,6 +223,15 @@ export const registry: Record<string, HandlerRegistryEntry> = {
       requires: ['dns'],
     },
   },
+  'server-location': {
+    handler: serverLocationHandler,
+    metadata: {
+      name: 'server-location',
+      description: 'Determine the physical location of the server hosting the website based on its IP address. Looks up the IP in a geolocation database to map it to coordinates, then shows the city, region, country, timezone, ISP, and autonomous system. Useful for understanding content delivery latency, data residency compliance, and infrastructure topology.',
+      category: 'network',
+      requires: ['dns', 'http'],
+    },
+  },
   'trace-route': {
     handler: traceRouteHandler,
     metadata: {
@@ -324,6 +349,43 @@ export const registry: Record<string, HandlerRegistryEntry> = {
       name: 'tech-stack',
       description: 'Detect technologies from headers, meta tags, and HTML patterns',
       category: 'meta',
+      requires: ['http'],
+    },
+  },
+  'ssl-labs': {
+    handler: sslLabsHandler,
+    metadata: {
+      name: 'ssl-labs',
+      description: 'Run a Qualys SSL Labs assessment to get an overall SSL/TLS grade (A+, A, B, C, F) and detailed endpoint analysis.',
+      category: 'security',
+      requires: ['http'],
+    },
+  },
+  virustotal: {
+    handler: virusTotalHandler,
+    metadata: {
+      name: 'virustotal',
+      description: 'Scan the URL against 70+ antivirus engines via VirusTotal to detect malware, phishing, and other threats.',
+      category: 'security',
+      requiresApiKey: ['VIRUSTOTAL_API_KEY'],
+      requires: ['http'],
+    },
+  },
+  seo: {
+    handler: seoHandler,
+    metadata: {
+      name: 'seo',
+      description: 'On-page SEO audit: title, meta description, headings, images, canonical, structured data, word count, and overall score.',
+      category: 'content',
+      requires: ['http'],
+    },
+  },
+  wordpress: {
+    handler: wordpressHandler,
+    metadata: {
+      name: 'wordpress',
+      description: 'Detect WordPress installations and scan for exposed files, plugin/theme versions, and common misconfigurations.',
+      category: 'security',
       requires: ['http'],
     },
   },

@@ -29,6 +29,8 @@ export const config = {
     BUILT_WITH_API_KEY: process.env.BUILT_WITH_API_KEY || '',
     TRANCO_API_KEY: process.env.TRANCO_API_KEY || '',
     TRANCO_USERNAME: process.env.TRANCO_USERNAME || '',
+    VIRUSTOTAL_API_KEY: process.env.VIRUSTOTAL_API_KEY || '',
+    ABUSEIPDB_API_KEY: process.env.ABUSEIPDB_API_KEY || '',
   },
 } as const;
 

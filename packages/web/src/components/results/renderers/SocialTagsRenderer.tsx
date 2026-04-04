@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { KeyValueTable, SectionLabel } from "./primitives";
+import { SectionLabel } from "./primitives";
 import type { RendererProps } from "./types";
 import ImageLightbox from "@/components/ui/ImageLightbox";
 
@@ -22,13 +22,15 @@ interface SocialTagsData {
   favicon?: string;
 }
 
-function truncate(s: string | undefined, max = 80): string | undefined {
-  if (!s) return undefined;
-  return s.length > max ? s.slice(0, max) + "..." : s;
-}
-
-function kvIf(label: string, value?: string) {
-  return value ? [{ label, value }] : [];
+function StackedField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="py-2 border-b border-border/15 last:border-0">
+      <p className="text-[11px] text-muted uppercase tracking-[0.15em] font-semibold mb-0.5">
+        {label}
+      </p>
+      <p className="text-[15px] leading-snug text-foreground break-words">{value}</p>
+    </div>
+  );
 }
 
 export function SocialTagsRenderer({ data }: RendererProps) {
@@ -36,81 +38,86 @@ export function SocialTagsRenderer({ data }: RendererProps) {
   const d = data as SocialTagsData | undefined;
   if (!d) return <span className="text-sm text-muted">No social tags found</span>;
 
-  const ogItems = [
-    ...kvIf("Title", truncate(d.ogTitle)),
-    ...kvIf("Description", truncate(d.ogDescription)),
-    ...kvIf("Site Name", d.ogSiteName),
-  ];
+  const ogTitle = d.ogTitle;
+  const ogDesc = d.ogDescription;
+  const ogSiteName = d.ogSiteName;
+  const twitterCard = d.twitterCard;
+  const twitterSite = d.twitterSite;
+  const metaTitle = d.title;
+  const metaDesc = d.description;
+  const metaAuthor = d.author;
 
-  const twitterItems = [
-    ...kvIf("Card Type", d.twitterCard),
-    ...kvIf("Site", d.twitterSite),
-  ];
+  const hasOg = !!(ogTitle || ogDesc || ogSiteName);
+  const hasTwitter = !!(twitterCard || twitterSite);
+  const hasMeta = !!(metaTitle || metaDesc || metaAuthor);
 
-  const metaItems = [
-    ...kvIf("Title", truncate(d.title)),
-    ...kvIf("Description", truncate(d.description)),
-    ...kvIf("Author", d.author),
-    ...kvIf("Favicon", d.favicon),
-  ];
+  // Combine OG & Meta when titles and descriptions match
+  const ogTitleMatch = ogTitle && metaTitle && ogTitle === metaTitle;
+  const ogDescMatch = ogDesc && metaDesc && ogDesc === metaDesc;
+  const shouldCombine = ogTitleMatch && ogDescMatch && hasOg && hasMeta;
 
-  if (!ogItems.length && !twitterItems.length && !metaItems.length) {
+  const previewImage = d.ogImage ?? d.twitterImage;
+
+  if (!hasOg && !hasTwitter && !hasMeta && !previewImage) {
     return <span className="text-sm text-muted">{d.message ?? "No social tags found"}</span>;
   }
-
-  // Combine OG & Meta if title and description match
-  const ogTitleMatch = d.ogTitle && d.title && d.ogTitle === d.title;
-  const ogDescMatch = d.ogDescription && d.description && d.ogDescription === d.description;
-  const shouldCombine = ogTitleMatch && ogDescMatch && ogItems.length > 0 && metaItems.length > 0;
-  const previewImage = d.ogImage ?? d.twitterImage;
 
   return (
     <>
       <div>
-      {shouldCombine ? (
-        <>
-          <SectionLabel>OpenGraph & Meta</SectionLabel>
-          <KeyValueTable items={ogItems} />
-        </>
-      ) : (
-        <>
-          {ogItems.length > 0 && (
-            <>
-              <SectionLabel>OpenGraph</SectionLabel>
-              <KeyValueTable items={ogItems} />
-            </>
-          )}
-          {metaItems.length > 0 && (
-            <>
-              <SectionLabel>Meta</SectionLabel>
-              <KeyValueTable items={metaItems} />
-            </>
-          )}
-        </>
-      )}
-      {twitterItems.length > 0 && (
-        <>
-          <SectionLabel>Twitter</SectionLabel>
-          <KeyValueTable items={twitterItems} />
-        </>
-      )}
-      {previewImage && (
-        <>
-          <SectionLabel>Preview Image</SectionLabel>
-          <button
-            type="button"
-            onClick={() => setLightboxSrc(previewImage)}
-            className="mt-2 block w-full overflow-hidden rounded-xl border border-border/30 bg-surface/40 transition-opacity hover:opacity-95"
-          >
-            <img
-              src={previewImage}
-              alt="Social preview"
-              className="h-auto max-h-[260px] w-full object-cover object-top"
-              loading="lazy"
-            />
-          </button>
-        </>
-      )}
+        {shouldCombine ? (
+          <>
+            <SectionLabel>OpenGraph & Meta</SectionLabel>
+            {ogTitle && <StackedField label="Title" value={ogTitle} />}
+            {ogDesc && <StackedField label="Description" value={ogDesc} />}
+            {ogSiteName && <StackedField label="Site Name" value={ogSiteName} />}
+          </>
+        ) : (
+          <>
+            {hasOg && (
+              <>
+                <SectionLabel>OpenGraph</SectionLabel>
+                {ogTitle && <StackedField label="Title" value={ogTitle} />}
+                {ogDesc && <StackedField label="Description" value={ogDesc} />}
+                {ogSiteName && <StackedField label="Site Name" value={ogSiteName} />}
+              </>
+            )}
+            {hasMeta && (
+              <>
+                <SectionLabel>Meta</SectionLabel>
+                {metaTitle && <StackedField label="Title" value={metaTitle} />}
+                {metaDesc && <StackedField label="Description" value={metaDesc} />}
+                {metaAuthor && <StackedField label="Author" value={metaAuthor} />}
+              </>
+            )}
+          </>
+        )}
+
+        {hasTwitter && (
+          <>
+            <SectionLabel>Twitter</SectionLabel>
+            {twitterCard && <StackedField label="Card Type" value={twitterCard} />}
+            {twitterSite && <StackedField label="Site" value={twitterSite} />}
+          </>
+        )}
+
+        {previewImage && (
+          <>
+            <SectionLabel>Preview Image</SectionLabel>
+            <button
+              type="button"
+              onClick={() => setLightboxSrc(previewImage)}
+              className="mt-2 block w-full overflow-hidden rounded-xl border border-border/30 bg-surface/40 transition-opacity hover:opacity-95"
+            >
+              <img
+                src={previewImage}
+                alt="Social preview"
+                className="h-auto max-h-[260px] w-full object-cover object-top"
+                loading="lazy"
+              />
+            </button>
+          </>
+        )}
       </div>
       {lightboxSrc && (
         <ImageLightbox

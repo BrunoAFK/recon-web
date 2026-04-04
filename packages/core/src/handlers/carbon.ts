@@ -1,5 +1,6 @@
 import https from 'https';
 import type { AnalysisHandler, HandlerResult } from '../types.js';
+import { normalizeUrl } from '../utils/url.js';
 
 interface CarbonStatistics {
   adjustedBytes: number;
@@ -67,7 +68,8 @@ const fetchCarbonData = (apiUrl: string): Promise<Record<string, unknown>> =>
 
 export const carbonHandler: AnalysisHandler<CarbonResult> = async (url, options) => {
   try {
-    const sizeInBytes = await getHtmlSize(url);
+    const normalized = normalizeUrl(url);
+    const sizeInBytes = await getHtmlSize(normalized);
     const apiUrl = `https://api.websitecarbon.com/data?bytes=${sizeInBytes}&green=0`;
 
     const carbonData = await fetchCarbonData(apiUrl);
@@ -76,7 +78,7 @@ export const carbonHandler: AnalysisHandler<CarbonResult> = async (url, options)
     if (!stats || (stats.adjustedBytes === 0 && stats.energy === 0)) {
       return {
         data: {
-          scanUrl: url,
+          scanUrl: normalized,
           statistics: (stats ??
             ({
               adjustedBytes: 0,
@@ -94,7 +96,7 @@ export const carbonHandler: AnalysisHandler<CarbonResult> = async (url, options)
     }
 
     const result: CarbonResult = {
-      scanUrl: url,
+      scanUrl: normalized,
       statistics: stats,
       cleanerThan: carbonData.cleanerThan as number,
       green: carbonData.green as boolean,

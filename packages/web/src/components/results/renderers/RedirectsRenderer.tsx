@@ -1,3 +1,4 @@
+import { CornerDownRight } from "lucide-react";
 import type { RendererProps } from "./types";
 
 export function RedirectsRenderer({ data }: RendererProps) {
@@ -13,22 +14,19 @@ export function RedirectsRenderer({ data }: RendererProps) {
     return <p className="text-sm text-muted">No redirects detected.</p>;
   }
 
-  const truncate = (url: string, max = 60) =>
-    url.length > max ? url.slice(0, max) + "…" : url;
-
   return (
-    <ol className="space-y-1.5">
-      {redirects.map((url, i) => (
-        <li key={i} className="flex items-start gap-2 text-sm">
-          <span className="shrink-0 text-muted font-medium w-5 text-right">
-            {i + 1}.
-          </span>
-          <span className="break-all">{truncate(url)}</span>
-          {i < redirects.length - 1 && (
-            <span className="shrink-0 text-muted ml-auto">&rarr;</span>
-          )}
-        </li>
-      ))}
-    </ol>
+    <div>
+      <p className="text-sm text-muted mb-3">
+        Followed {redirects.length} redirect{redirects.length > 1 ? "s" : ""} when contacting host
+      </p>
+      <div className="space-y-0">
+        {redirects.map((url, i) => (
+          <div key={i} className="flex items-start gap-2.5 py-2 border-b border-border/15 last:border-0">
+            <CornerDownRight className="h-4 w-4 text-accent shrink-0 mt-0.5" />
+            <span className="text-sm text-foreground break-all">{url}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

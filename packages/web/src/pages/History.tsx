@@ -96,71 +96,74 @@ export default function History() {
           {scans.map((scan) => (
             <div
               key={scan.id}
-              className={`flex items-center gap-4 rounded-xl border p-4 transition-colors ${
+              className={`rounded-xl border p-4 transition-colors ${
                 selected.has(scan.id)
                   ? "border-accent/50 bg-accent/5"
                   : "border-border/50 bg-surface/50 hover:border-border"
               }`}
             >
-              <button
-                onClick={() => toggleSelect(scan.id)}
-                className={`shrink-0 w-5 h-5 rounded border-2 transition-colors flex items-center justify-center ${
-                  selected.has(scan.id)
-                    ? "border-accent bg-accent text-white"
-                    : "border-border/60 hover:border-accent/50"
-                }`}
-                title="Select for comparison"
-              >
-                {selected.has(scan.id) && (
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </button>
-
-              <div className="flex-1 min-w-0">
-                <Link
-                  to={`/history/${scan.id}`}
-                  className="text-sm font-medium text-foreground hover:text-accent transition-colors truncate block"
+              <div className="flex items-start gap-3">
+                <button
+                  onClick={() => toggleSelect(scan.id)}
+                  className={`shrink-0 mt-0.5 w-5 h-5 rounded border-2 transition-colors flex items-center justify-center ${
+                    selected.has(scan.id)
+                      ? "border-accent bg-accent text-white"
+                      : "border-border/60 hover:border-accent/50"
+                  }`}
+                  title="Select for comparison"
                 >
-                  {scan.url}
-                </Link>
-                <div className="flex items-center gap-3 mt-1 text-sm text-muted">
-                  <span>{new Date(scan.created_at).toLocaleString()}</span>
-                  <span>{scan.handler_count} handlers</span>
-                  {scan.duration_ms != null && (
-                    <span>{(scan.duration_ms / 1000).toFixed(1)}s</span>
+                  {selected.has(scan.id) && (
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
                   )}
-                  <span
-                    className={
-                      scan.status === "completed"
-                        ? "text-emerald-400"
-                        : scan.status === "running"
-                          ? "text-amber-400"
-                          : "text-red-400"
-                    }
+                </button>
+
+                <div className="flex-1 min-w-0">
+                  <Link
+                    to={`/history/${scan.id}`}
+                    className="text-sm font-medium text-foreground hover:text-accent transition-colors truncate block"
                   >
-                    {scan.status}
-                  </span>
+                    {scan.url}
+                  </Link>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-sm text-muted">
+                    <span>{new Date(scan.created_at).toLocaleString()}</span>
+                    <span>{scan.handler_count} checks</span>
+                    {scan.duration_ms != null && (
+                      <span>{(scan.duration_ms / 1000).toFixed(1)}s</span>
+                    )}
+                    <span
+                      className={
+                        scan.status === "completed"
+                          ? "text-emerald-400"
+                          : scan.status === "running"
+                            ? "text-amber-400"
+                            : "text-red-400"
+                      }
+                    >
+                      {scan.status}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <Link
+                    to={`/history/${scan.id}`}
+                    className="p-2 text-muted hover:text-foreground transition-colors"
+                    title="View results"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Link>
+                  <button
+                    onClick={() => deleteMutation.mutate(scan.id)}
+                    disabled={deleteMutation.isPending}
+                    className="p-2 text-muted hover:text-red-400 transition-colors disabled:opacity-50"
+                    title="Delete scan"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
-
-              <Link
-                to={`/history/${scan.id}`}
-                className="shrink-0 p-2 text-muted hover:text-foreground transition-colors"
-                title="View results"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </Link>
-
-              <button
-                onClick={() => deleteMutation.mutate(scan.id)}
-                disabled={deleteMutation.isPending}
-                className="shrink-0 p-2 text-muted hover:text-red-400 transition-colors disabled:opacity-50"
-                title="Delete scan"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
             </div>
           ))}
 

@@ -5,6 +5,19 @@ interface HandlerDetailedInfo {
 }
 
 export const HANDLER_INFO: Record<string, HandlerDetailedInfo> = {
+  "abuse-ipdb": {
+    detail:
+      "Resolves the domain to an IP address and checks it against AbuseIPDB, a community-driven database of reported malicious IPs. Returns an abuse confidence score (0-100%), total number of reports, ISP, and usage type. Requires a free API key.",
+    examples: [
+      "A score above 25% indicates the IP has been repeatedly reported for spam, brute-force, or DDoS attacks.",
+      "Shared hosting IPs may have high scores due to other tenants — check the usage type to distinguish.",
+      "Recently reported IPs (last 90 days) are more relevant than historical data for active threat assessment.",
+    ],
+    links: [
+      { label: "AbuseIPDB", url: "https://www.abuseipdb.com/" },
+      { label: "API Docs", url: "https://docs.abuseipdb.com/" },
+    ],
+  },
   dns: {
     detail:
       "Resolves all DNS record types for the domain including A (IPv4), AAAA (IPv6), MX (mail), TXT (verification/SPF), NS (nameservers), CNAME (aliases), SOA (authority), SRV (services), and PTR (reverse). This reveals how the domain's infrastructure is configured.",
@@ -305,6 +318,71 @@ export const HANDLER_INFO: Record<string, HandlerDetailedInfo> = {
       "Visual comparison across scans detects defacements, injected content, or broken layouts.",
       "Screenshots reveal if a site shows different content to bots vs. users (cloaking).",
       "Useful for archival purposes — documenting a site's appearance at a specific point in time.",
+    ],
+  },
+  seo: {
+    detail:
+      "Performs a comprehensive on-page SEO audit by fetching the HTML and analyzing key ranking factors. Checks title tag length, meta description, heading hierarchy (H1-H6), image alt text coverage, canonical URL, viewport meta, structured data (JSON-LD), hreflang tags, meta robots directives, word count, and text-to-HTML ratio. Returns a 0-100 score based on issues found.",
+    examples: [
+      "A missing or duplicate H1 is one of the most common on-page SEO issues — every page should have exactly one.",
+      "Pages with fewer than 300 words often struggle to rank, as search engines may consider them thin content.",
+      "Missing structured data (JSON-LD) means your pages won't get rich snippets in search results — reviews, FAQs, products, etc.",
+    ],
+    links: [
+      { label: "Google SEO Starter Guide", url: "https://developers.google.com/search/docs/fundamentals/seo-starter-guide" },
+      { label: "Schema.org", url: "https://schema.org/" },
+    ],
+  },
+  wordpress: {
+    detail:
+      "Passively scans a website to detect if it runs WordPress, then enumerates plugins, themes, and their exposed versions from the page HTML. Checks for commonly exploited files (xmlrpc.php, debug logs, config backups, user enumeration endpoints) and reports security misconfigurations. No API key required — all detection is done from publicly visible data.",
+    examples: [
+      "An exposed xmlrpc.php enables brute-force login attacks and can be used for DDoS amplification via pingbacks.",
+      "Public version numbers for plugins and themes allow attackers to match known CVEs to exact versions.",
+      "An accessible wp-content/debug.log may leak database queries, file paths, and PHP errors to anyone.",
+    ],
+    links: [
+      { label: "WordPress Security", url: "https://developer.wordpress.org/advanced-administration/security/hardening/" },
+      { label: "WPScan", url: "https://wpscan.com/" },
+    ],
+  },
+  virustotal: {
+    detail:
+      "Submits the URL to VirusTotal which scans it against 70+ antivirus engines and security vendors (Google Safe Browsing, Kaspersky, BitDefender, Sophos, etc.). Returns the number of engines that flagged the URL as malicious or suspicious. Requires a free API key.",
+    examples: [
+      "Even 1-2 detections warrant investigation — false positives exist but multiple flags are a strong signal.",
+      "A clean VirusTotal report doesn't guarantee safety — zero-day threats and new phishing sites may not be indexed yet.",
+      "The permalink lets you view the full report including individual engine verdicts and community comments.",
+    ],
+    links: [
+      { label: "VirusTotal", url: "https://www.virustotal.com/" },
+      { label: "API Docs", url: "https://docs.virustotal.com/reference/overview" },
+    ],
+  },
+  "ssl-labs": {
+    detail:
+      "Submits the domain to the Qualys SSL Labs API which performs a deep analysis of the server's SSL/TLS configuration. Returns a letter grade (A+, A, B, C, F) based on protocol support, key exchange strength, cipher strength, and certificate validity. Multiple endpoints are tested if the domain resolves to more than one IP.",
+    examples: [
+      "An A+ grade requires HSTS with a long max-age — without it, the best you can get is A.",
+      "Grade B typically means the server still supports older TLS 1.0/1.1 protocols which have known vulnerabilities.",
+      "Grade F means a critical issue like an expired certificate, vulnerable to known attacks (POODLE, Heartbleed), or no HTTPS at all.",
+    ],
+    links: [
+      { label: "SSL Labs", url: "https://www.ssllabs.com/ssltest/" },
+      { label: "SSL Labs API Docs", url: "https://github.com/ssllabs/ssllabs-scan/blob/master/ssllabs-api-docs-v3.md" },
+    ],
+  },
+  "server-location": {
+    detail:
+      "Determines the physical location of the server hosting the website by resolving the domain to an IP address and looking it up in a geolocation database. Returns city, region, country, timezone, latitude/longitude coordinates, ISP, and autonomous system number. The result is displayed on an interactive map for quick visual reference.",
+    examples: [
+      "A site claiming to host data in the EU but with servers in the US may violate GDPR data residency requirements.",
+      "Servers far from your target audience introduce latency — a site serving Asian users from a US data center adds 150-300ms per request.",
+      "Identifying the ISP and AS number reveals the hosting provider — useful for assessing infrastructure reliability and DDoS resilience.",
+    ],
+    links: [
+      { label: "IP Geolocation", url: "https://en.wikipedia.org/wiki/Internet_geolocation" },
+      { label: "ip-api.com", url: "https://ip-api.com/" },
     ],
   },
 };

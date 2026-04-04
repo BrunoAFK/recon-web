@@ -57,33 +57,32 @@ export default function HistoryResults() {
         </Link>
 
         {scan.data && (
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h1
-                className="text-3xl font-bold tracking-tight mb-2"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                {url}
-              </h1>
-              <div className="flex items-center gap-4 text-[14px] text-muted">
-                <span className="flex items-center gap-1.5">
-                  <Calendar className="h-3.5 w-3.5" />
-                  {new Date(scan.data.created_at).toLocaleString()}
-                </span>
+          <div>
+            <h1
+              className="text-3xl font-bold tracking-tight mb-2"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              {url}
+            </h1>
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] text-muted mb-4">
+              <span className="flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5" />
+                {new Date(scan.data.created_at).toLocaleString()}
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                {resultCount} checks
+              </span>
+              {scan.data.duration_ms != null && (
                 <span className="flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5" />
-                  {resultCount} checks completed
+                  {(scan.data.duration_ms / 1000).toFixed(1)}s
                 </span>
-                {scan.data.duration_ms != null && (
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5" />
-                    {(scan.data.duration_ms / 1000).toFixed(1)}s
-                  </span>
-                )}
-              </div>
+              )}
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={async () => {
                   if (!scanId) return;
@@ -94,7 +93,7 @@ export default function HistoryResults() {
                 className="inline-flex items-center gap-1.5 rounded-lg border border-border/50 px-3 py-2 text-sm text-muted hover:text-foreground hover:border-border transition-colors disabled:opacity-50"
               >
                 {reportLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-                Report
+                PDF Report
               </button>
               <button
                 onClick={() => {

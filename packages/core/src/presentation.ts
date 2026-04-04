@@ -3,6 +3,10 @@ import type { HandlerMetadata } from './types.js';
 type HandlerPresentation = Pick<HandlerMetadata, 'displayName' | 'shortDescription'>;
 
 export const handlerPresentation: Record<string, HandlerPresentation> = {
+  'abuse-ipdb': {
+    displayName: 'AbuseIPDB',
+    shortDescription: 'Check the server IP reputation and abuse confidence score.',
+  },
   dns: {
     displayName: 'DNS Records',
     shortDescription: 'Resolve core DNS records and inspect how the domain routes traffic.',
@@ -134,6 +138,26 @@ export const handlerPresentation: Record<string, HandlerPresentation> = {
   screenshot: {
     displayName: 'Visual Screenshot',
     shortDescription: 'Capture a rendered snapshot of the target page.',
+  },
+  seo: {
+    displayName: 'SEO Audit',
+    shortDescription: 'Audit on-page SEO factors and get an overall optimization score.',
+  },
+  wordpress: {
+    displayName: 'WordPress Scan',
+    shortDescription: 'Detect WordPress version, plugins, themes, and security misconfigurations.',
+  },
+  virustotal: {
+    displayName: 'VirusTotal',
+    shortDescription: 'Scan the URL against 70+ antivirus and security engines.',
+  },
+  'ssl-labs': {
+    displayName: 'SSL Labs Grade',
+    shortDescription: 'Get a Qualys SSL Labs grade for the server\'s TLS configuration.',
+  },
+  'server-location': {
+    displayName: 'Server Location',
+    shortDescription: 'Pinpoint where the server is physically hosted on a world map.',
   },
 };
 

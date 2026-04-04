@@ -190,6 +190,38 @@ export function DotGrid({
   );
 }
 
+/* ── Verdict ─────────────────────────────────────────────── */
+
+/** A prominent pass/fail verdict with an optional explanation. */
+export function Verdict({
+  label,
+  passed,
+  description,
+}: {
+  label: string;
+  passed: boolean;
+  description?: string;
+}) {
+  return (
+    <div className={`rounded-lg px-3.5 py-3 ${passed ? "bg-success/8" : "bg-danger/8"}`}>
+      <div className="flex items-center gap-2">
+        {passed ? (
+          <Check className="h-4 w-4 text-success shrink-0" />
+        ) : (
+          <X className="h-4 w-4 text-danger shrink-0" />
+        )}
+        <span className="text-sm font-medium text-foreground">{label}</span>
+        <span className={`text-sm font-semibold ml-auto ${passed ? "text-success" : "text-danger"}`}>
+          {passed ? "Yes" : "No"}
+        </span>
+      </div>
+      {description && (
+        <p className="text-sm text-muted mt-1.5 ml-6">{description}</p>
+      )}
+    </div>
+  );
+}
+
 /* ── SectionLabel ────────────────────────────────────────── */
 
 export function SectionLabel({ children }: { children: string }) {

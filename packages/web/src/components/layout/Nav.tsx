@@ -96,7 +96,7 @@ export default function Nav() {
           </div>
 
           <a
-            href="https://github.com/pavelja/recon-web"
+            href="https://github.com/BrunoAFK/recon-web"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted hover:text-foreground hover:bg-surface-light/50 transition-colors"

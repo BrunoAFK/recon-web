@@ -1,4 +1,4 @@
-import { ChecklistItem, CodeBlock, KeyValueRow } from "./primitives";
+import { ChecklistItem, CodeBlock, KeyValueRow, Verdict } from "./primitives";
 import type { RendererProps } from "./types";
 
 interface HstsData {
@@ -14,14 +14,17 @@ export function HstsRenderer({ data }: RendererProps) {
 
   if (noHsts) {
     return (
-      <div>
-        <span className="text-sm text-muted">No HSTS headers</span>
-      </div>
+      <Verdict
+        label="HSTS Enabled?"
+        passed={false}
+        description="Site does not serve any HSTS headers. Browsers can be tricked into connecting over plain HTTP."
+      />
     );
   }
 
   return (
-    <div>
+    <div className="space-y-3">
+      <Verdict label="HSTS Enabled?" passed={true} />
       <ChecklistItem
         label="Preload Compatible"
         passed={d?.compatible ?? false}
@@ -31,9 +34,6 @@ export function HstsRenderer({ data }: RendererProps) {
           label="Header"
           value={<CodeBlock>{d.hstsHeader}</CodeBlock>}
         />
-      )}
-      {d?.message && (
-        <KeyValueRow label="Message" value={d.message} />
       )}
     </div>
   );

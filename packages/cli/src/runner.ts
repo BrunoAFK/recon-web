@@ -99,6 +99,7 @@ async function runJson(
 
   console.log(JSON.stringify(output, null, 2));
   handleFailOn(options, results);
+  process.exit(0);
 }
 
 async function runJunit(
@@ -116,6 +117,7 @@ async function runJunit(
 
   console.log(formatJunit(url, results, durationMs));
   handleFailOn(options, results);
+  process.exit(0);
 }
 
 function handleFailOn(
@@ -218,6 +220,7 @@ async function runInteractive(
   }
 
   handleFailOn(options, resultsMap);
+  process.exit(0);
 }
 
 export async function runSingle(
@@ -256,4 +259,5 @@ export async function runSingle(
   spinner.stop();
 
   console.log(formatHandlerResult(handlerName, entry.metadata, result, options.verbose ?? true));
+  process.exit(0);
 }

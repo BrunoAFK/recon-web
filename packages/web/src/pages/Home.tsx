@@ -1,4 +1,4 @@
-import { useState, FormEvent } from "react";
+import { useState, useCallback, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Search,
@@ -12,6 +12,9 @@ import {
   Gauge,
   BookOpen,
   Github,
+  Terminal,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useHandlers } from "@/hooks/use-scan";
 import type { HandlerCategory } from "@/lib/api";
@@ -84,7 +87,8 @@ export default function Home() {
           <span className="text-accent">website</span>
         </h1>
         <p className="text-lg text-muted max-w-md mx-auto leading-relaxed">
-          Security, DNS, technologies, performance — 33 checks in one scan.
+          Security, DNS, technologies, performance —{" "}
+          {handlers.data ? handlers.data.length : "30+"} checks in one scan.
         </p>
       </div>
 
@@ -131,7 +135,7 @@ export default function Home() {
         </a>
         <span className="text-border">|</span>
         <a
-          href="https://github.com/pavelja/recon-web"
+          href="https://github.com/BrunoAFK/recon-web"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground transition-colors"
@@ -143,7 +147,7 @@ export default function Home() {
 
       {/* Feature highlights */}
       <div
-        className="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-3xl w-full animate-fade-in"
+        className="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-4xl w-full animate-fade-in"
         style={{ animationDelay: "200ms" }}
       >
         <FeatureCard
@@ -161,6 +165,35 @@ export default function Home() {
           title="Tech & Performance"
           description="Tech stack detection, carbon footprint, response times."
         />
+      </div>
+
+      {/* CLI card */}
+      <div
+        className="mt-10 w-full max-w-4xl animate-fade-in"
+        style={{ animationDelay: "250ms" }}
+      >
+        <div className="rounded-xl border border-border/40 bg-surface/40 p-6 sm:p-8">
+          <div className="flex items-start gap-4">
+            <div className="shrink-0 hidden sm:block rounded-lg bg-accent/10 p-3">
+              <Terminal className="h-6 w-6 text-accent" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3
+                className="text-lg font-semibold mb-1"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                CLI available
+              </h3>
+              <p className="text-[15px] text-muted leading-relaxed mb-4">
+                Run scans from your terminal or CI pipeline. No setup needed — just Docker.
+              </p>
+              <CliCommand command="docker run --rm ghcr.io/brunoafk/recon-web/cli scan example.com" />
+              <p className="text-xs text-muted mt-3">
+                Supports JSON, JUnit XML output, threshold checks, and diff against previous scans.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* What We Check — full handler list */}
@@ -192,12 +225,11 @@ export default function Home() {
                     </h3>
                     <span className="text-sm text-muted ml-auto">{catHandlers.length}</span>
                   </div>
-                  <ul className="space-y-1.5">
+                  <ul className="space-y-3">
                     {catHandlers.map((h) => (
-                      <li key={h.name} className="flex items-baseline gap-2 text-sm">
-                        <span className="text-accent text-sm">&#9679;</span>
-                        <span className="font-medium">{h.name}</span>
-                        <span className="text-muted text-sm truncate">{h.description}</span>
+                      <li key={h.name} className="text-sm">
+                        <p className="font-medium">{h.displayName ?? h.name}</p>
+                        <p className="text-muted mt-0.5 leading-snug">{h.shortDescription ?? h.description}</p>
                       </li>
                     ))}
                   </ul>
@@ -208,12 +240,32 @@ export default function Home() {
         </div>
       )}
 
-      {/* Ad placement */}
-      <div className="mt-16 w-full max-w-3xl">
-        <div className="min-h-[90px] rounded-xl border border-border/20 bg-surface/20 flex items-center justify-center text-sm text-muted/30">
-          {/* Ad slot placeholder */}
-        </div>
-      </div>
+    </div>
+  );
+}
+
+function CliCommand({ command }: { command: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(command).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [command]);
+
+  return (
+    <div className="relative rounded-lg bg-background/60 border border-border/30 px-4 py-3 font-mono text-sm text-foreground overflow-x-auto group">
+      <span className="text-muted select-none">$ </span>
+      <span>{command}</span>
+      <button
+        type="button"
+        onClick={handleCopy}
+        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted hover:text-foreground hover:bg-surface-light/50 opacity-0 group-hover:opacity-100 transition-all"
+        title="Copy to clipboard"
+      >
+        {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
+      </button>
     </div>
   );
 }
