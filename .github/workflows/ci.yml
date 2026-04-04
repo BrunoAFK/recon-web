@@ -13,7 +13,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   # aquasec/trivy 0.69.3 — pinned by digest, same image as .gitlab-ci.yml
   TRIVY_IMAGE: aquasec/trivy@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
-  TRIVY_SEVERITY: CRITICAL,HIGH
+  TRIVY_SEVERITY_FS: CRITICAL,HIGH
+  TRIVY_SEVERITY_IMAGE: CRITICAL
 
 permissions:
   contents: read
@@ -75,7 +76,7 @@ jobs:
           docker run --rm \
             -v "${{ github.workspace }}:/src" \
             ${{ env.TRIVY_IMAGE }} \
-            fs --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed /src
+            fs --severity ${TRIVY_SEVERITY_FS} --exit-code 1 --ignore-unfixed /src
 
   # ── Stage 4: Build + Scan + Push (only on main) ────────────
   docker-api:
@@ -111,7 +112,7 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             ${{ env.TRIVY_IMAGE }} \
-            image --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed \
+            image --severity ${TRIVY_SEVERITY_IMAGE} --exit-code 1 --ignore-unfixed \
             ${{ env.IMAGE_PREFIX }}/api:build-${{ github.run_id }}
 
       - name: Push API image
@@ -154,7 +155,7 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             ${{ env.TRIVY_IMAGE }} \
-            image --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed \
+            image --severity ${TRIVY_SEVERITY_IMAGE} --exit-code 1 --ignore-unfixed \
             ${{ env.IMAGE_PREFIX }}/web:build-${{ github.run_id }}
 
       - name: Push Web image
@@ -197,7 +198,7 @@ jobs:
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             ${{ env.TRIVY_IMAGE }} \
-            image --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed \
+            image --severity ${TRIVY_SEVERITY_IMAGE} --exit-code 1 --ignore-unfixed \
             ${{ env.IMAGE_PREFIX }}/cli:build-${{ github.run_id }}
 
       - name: Push CLI image

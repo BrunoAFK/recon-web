@@ -33,6 +33,8 @@ RUN npm run build --workspace=@recon-web/web
 # nginx:1.29.7-alpine3.23
 FROM nginx@sha256:e7257f1ef28ba17cf7c248cb8ccf6f0c6e0228ab9c315c152f9c203cd34cf6d1 AS runtime
 
+RUN apk add --no-cache libpng=1.6.56-r0 zlib=1.3.2-r0
+
 COPY --from=build /app/packages/web/dist /usr/share/nginx/html
 COPY packages/web/nginx.conf.template /etc/nginx/templates/default.conf.template
 

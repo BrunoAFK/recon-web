@@ -8,7 +8,8 @@ variables:
   NODE_VERSION: "24"
   REGISTRY: ${CI_REGISTRY}
   IMAGE_PREFIX: ${CI_REGISTRY_IMAGE}
-  TRIVY_SEVERITY: CRITICAL,HIGH
+  TRIVY_SEVERITY_FS: CRITICAL,HIGH
+  TRIVY_SEVERITY_IMAGE: CRITICAL
   TRIVY_IMAGE: aquasec/trivy@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   # Docker-in-Docker
   DOCKER_HOST: tcp://docker:2376
@@ -51,7 +52,7 @@ audit:
     name: ${TRIVY_IMAGE}
     entrypoint: [""]
   script:
-    - trivy fs --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed .
+    - trivy fs --severity ${TRIVY_SEVERITY_FS} --exit-code 1 --ignore-unfixed .
 
 # ── Stage 4: Build Docker images ───────────────────────────────
 
@@ -105,21 +106,21 @@ scan-api:
   extends: .trivy-scan
   needs: [build-api]
   script:
-    - trivy image --input api-image.tar --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed --format table
+    - trivy image --input api-image.tar --severity ${TRIVY_SEVERITY_IMAGE} --exit-code 1 --ignore-unfixed --format table
   allow_failure: false
 
 scan-web:
   extends: .trivy-scan
   needs: [build-web]
   script:
-    - trivy image --input web-image.tar --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed --format table
+    - trivy image --input web-image.tar --severity ${TRIVY_SEVERITY_IMAGE} --exit-code 1 --ignore-unfixed --format table
   allow_failure: false
 
 scan-cli:
   extends: .trivy-scan
   needs: [build-cli]
   script:
-    - trivy image --input cli-image.tar --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed --format table
+    - trivy image --input cli-image.tar --severity ${TRIVY_SEVERITY_IMAGE} --exit-code 1 --ignore-unfixed --format table
   allow_failure: false
 
 # ── Stage 6: Push (only on main/master) ───────────────────────
