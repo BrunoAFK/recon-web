@@ -1,13 +1,16 @@
 # Remote images — pulls pre-built images from GHCR.
 # Usage: docker compose -f docker-compose.remote.yml up
 #
-# Set REGISTRY to your GitHub Container Registry path, e.g.:
-#   export REGISTRY=ghcr.io/myuser/recon-web
-# Images are pushed by CI on every merge to main.
+# Available images:
+#   docker pull ghcr.io/brunoafk/recon-web/api:latest
+#   docker pull ghcr.io/brunoafk/recon-web/web:latest
+#   docker pull ghcr.io/brunoafk/recon-web/cli:latest
+#
+# Override with REGISTRY and TAG env vars if using a different registry.
 
 services:
   api:
-    image: ${REGISTRY:-ghcr.io/recon-web/recon-web}-api:${TAG:-latest}
+    image: ${REGISTRY:-ghcr.io/brunoafk/recon-web}/api:${TAG:-latest}
     ports:
       - "${API_PORT:-3000}:3000"
     env_file: .env
@@ -23,7 +26,7 @@ services:
     restart: unless-stopped
 
   web:
-    image: ${REGISTRY:-ghcr.io/recon-web/recon-web}-web:${TAG:-latest}
+    image: ${REGISTRY:-ghcr.io/brunoafk/recon-web}/web:${TAG:-latest}
     ports:
       - "${WEB_PORT:-8080}:80"
     depends_on:
@@ -34,7 +37,7 @@ services:
     restart: unless-stopped
 
   cli:
-    image: ${REGISTRY:-ghcr.io/recon-web/recon-web}-cli:${TAG:-latest}
+    image: ${REGISTRY:-ghcr.io/brunoafk/recon-web}/cli:${TAG:-latest}
     env_file: .env
     profiles: ["cli"]
 

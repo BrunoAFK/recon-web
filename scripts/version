@@ -1,0 +1,254 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ─────────────────────────────────────────────────────────────────
+# version — prepare and create a release on GitHub or GitLab
+#
+# Usage:
+#   ./scripts/version -v 1.0.0
+#   ./scripts/version -v 1.0.0 -d "Initial public release"
+#   ./scripts/version -v 1.0.0 -p gitlab
+#   ./scripts/version -v 1.0.0 -f releases/custom-notes.md
+#
+# Options:
+#   -v, --version     Version number (required, e.g. 1.0.0)
+#   -d, --description Short description for auto-generated release notes
+#   -p, --platform    Target platform: github (default) or gitlab
+#   -f, --file        Path to markdown file with release notes
+#   -h, --help        Show this help
+#
+# What it does:
+#   1. Updates version in package.json (root + all workspace packages)
+#   2. Creates/opens release notes file in releases/<version>.md
+#   3. Commits version bump + release notes
+#   4. Creates git tag v<version>
+#   5. Pushes tag and creates release on the target platform
+# ─────────────────────────────────────────────────────────────────
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+RELEASES_DIR="$ROOT_DIR/.releases"
+
+VERSION=""
+DESCRIPTION=""
+PLATFORM="github"
+NOTES_FILE=""
+
+# ── Parse arguments ──────────────────────────────────────────────
+
+usage() {
+  sed -n '/^# Usage:/,/^# ──/p' "$0" | head -n -1 | sed 's/^# //' | sed 's/^#//'
+  exit 0
+}
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -v|--version)     VERSION="$2"; shift 2 ;;
+    -d|--description) DESCRIPTION="$2"; shift 2 ;;
+    -p|--platform)    PLATFORM="$2"; shift 2 ;;
+    -f|--file)        NOTES_FILE="$2"; shift 2 ;;
+    -h|--help)        usage ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+if [[ -z "$VERSION" ]]; then
+  echo "Error: --version is required" >&2
+  echo "Usage: ./scripts/version -v 1.0.0" >&2
+  exit 1
+fi
+
+if [[ "$PLATFORM" != "github" && "$PLATFORM" != "gitlab" ]]; then
+  echo "Error: --platform must be 'github' or 'gitlab'" >&2
+  exit 1
+fi
+
+# Strip leading 'v' if provided (we add it ourselves)
+VERSION="${VERSION#v}"
+TAG="v${VERSION}"
+
+echo "── Preparing release ${TAG} for ${PLATFORM} ──"
+echo ""
+
+# ── Pre-flight checks ───────────────────────────────────────────
+
+cd "$ROOT_DIR"
+
+if ! git rev-parse HEAD &>/dev/null; then
+  echo "Error: No commits in repository. Make an initial commit first." >&2
+  exit 1
+fi
+
+if ! git diff --quiet HEAD || ! git diff --cached --quiet; then
+  echo "Error: You have uncommitted changes. Commit or stash them first." >&2
+  echo ""
+  git status --short >&2
+  exit 1
+fi
+
+if git tag -l "$TAG" | grep -q "$TAG"; then
+  echo "Error: Tag ${TAG} already exists." >&2
+  echo "To re-release, delete it first: git tag -d ${TAG} && git push origin :refs/tags/${TAG}" >&2
+  exit 1
+fi
+
+# ── Step 1: Update package.json versions ─────────────────────────
+
+echo "→ Updating package.json versions to ${VERSION}..."
+
+# Root package.json
+cd "$ROOT_DIR"
+npm version "$VERSION" --no-git-tag-version --allow-same-version
+
+# Workspace packages
+for pkg in packages/*/package.json; do
+  dir="$(dirname "$pkg")"
+  (cd "$dir" && npm version "$VERSION" --no-git-tag-version --allow-same-version) 2>/dev/null || true
+done
+
+echo "  Done."
+
+# ── Step 2: Resolve release notes ───────────────────────────────
+
+mkdir -p "$RELEASES_DIR"
+
+if [[ -n "$NOTES_FILE" ]]; then
+  # User provided a specific file
+  if [[ ! -f "$NOTES_FILE" ]]; then
+    echo "Error: Release notes file not found: ${NOTES_FILE}" >&2
+    exit 1
+  fi
+  RELEASE_NOTES="$NOTES_FILE"
+  echo "→ Using provided release notes: ${RELEASE_NOTES}"
+else
+  # Check for releases/<version>.md or releases/new.md
+  RELEASE_NOTES=""
+
+  if [[ -f "$RELEASES_DIR/${VERSION}.md" ]]; then
+    RELEASE_NOTES="$RELEASES_DIR/${VERSION}.md"
+    echo "→ Found existing release notes: ${RELEASE_NOTES}"
+  elif [[ -f "$RELEASES_DIR/new.md" ]]; then
+    mv "$RELEASES_DIR/new.md" "$RELEASES_DIR/${VERSION}.md"
+    RELEASE_NOTES="$RELEASES_DIR/${VERSION}.md"
+    echo "→ Renamed releases/new.md → ${VERSION}.md"
+  else
+    # Create template and open editor
+    RELEASE_NOTES="$RELEASES_DIR/${VERSION}.md"
+
+    cat > "$RELEASE_NOTES" <<TMPL
+# ${TAG}
+
+${DESCRIPTION:-Release ${TAG}}
+
+## What's changed
+
+-
+
+## Docker images
+
+\`\`\`bash
+docker pull ghcr.io/brunoafk/recon-web/api:${TAG}
+docker pull ghcr.io/brunoafk/recon-web/web:${TAG}
+docker pull ghcr.io/brunoafk/recon-web/cli:${TAG}
+\`\`\`
+TMPL
+
+    echo "→ Created release notes template: ${RELEASE_NOTES}"
+    echo "→ Opening editor..."
+
+    # Try VS Code first, fall back to vim
+    if command -v code &>/dev/null; then
+      code --wait "$RELEASE_NOTES"
+    elif [[ -n "${VISUAL:-}" ]]; then
+      $VISUAL "$RELEASE_NOTES"
+    elif [[ -n "${EDITOR:-}" ]]; then
+      $EDITOR "$RELEASE_NOTES"
+    else
+      vim "$RELEASE_NOTES"
+    fi
+  fi
+fi
+
+# Verify release notes aren't empty
+if [[ ! -s "$RELEASE_NOTES" ]]; then
+  echo "Error: Release notes file is empty. Aborting." >&2
+  exit 1
+fi
+
+echo ""
+echo "── Release notes ──"
+cat "$RELEASE_NOTES"
+echo ""
+echo "───────────────────"
+echo ""
+
+# ── Step 3: Commit version bump ─────────────────────────────────
+
+echo "→ Staging changes..."
+cd "$ROOT_DIR"
+git add package.json package-lock.json packages/*/package.json .releases/
+
+if git diff --cached --quiet; then
+  echo "  No file changes to commit."
+else
+  echo "→ Committing version bump..."
+  git commit -m "release: ${TAG}"
+fi
+
+# ── Step 4: Create git tag ──────────────────────────────────────
+
+echo "→ Creating tag ${TAG}..."
+git tag -a "$TAG" -m "Release ${TAG}"
+
+# ── Step 5: Push and create release ─────────────────────────────
+
+echo "→ Pushing commits and tag..."
+git push origin HEAD
+git push origin "$TAG"
+
+echo ""
+
+if [[ "$PLATFORM" == "github" ]]; then
+  if ! command -v gh &>/dev/null; then
+    echo "Error: 'gh' CLI not found. Install it: https://cli.github.com" >&2
+    echo "Tag ${TAG} has been pushed. Create the release manually on GitHub." >&2
+    exit 1
+  fi
+
+  echo "→ Creating GitHub release..."
+  gh release create "$TAG" \
+    --title "$TAG" \
+    --notes-file "$RELEASE_NOTES"
+
+  echo ""
+  echo "✓ GitHub release created: $(gh release view "$TAG" --json url -q .url)"
+
+elif [[ "$PLATFORM" == "gitlab" ]]; then
+  if ! command -v glab &>/dev/null; then
+    echo "Error: 'glab' CLI not found. Install it: https://gitlab.com/gitlab-org/cli" >&2
+    echo "Tag ${TAG} has been pushed. Create the release manually on GitLab." >&2
+    exit 1
+  fi
+
+  echo "→ Creating GitLab release..."
+  glab release create "$TAG" \
+    --name "$TAG" \
+    --notes-file "$RELEASE_NOTES"
+
+  echo ""
+  echo "✓ GitLab release created."
+fi
+
+echo ""
+echo "── Done ──"
+echo "Version:  ${VERSION}"
+echo "Tag:      ${TAG}"
+echo "Platform: ${PLATFORM}"
+echo "Notes:    ${RELEASE_NOTES}"
+
+# Docker image tags (for CI — pipeline will build and tag on push)
+echo ""
+echo "Docker images will be available after CI completes:"
+echo "  ghcr.io/brunoafk/recon-web/api:${TAG}"
+echo "  ghcr.io/brunoafk/recon-web/web:${TAG}"
+echo "  ghcr.io/brunoafk/recon-web/cli:${TAG}"

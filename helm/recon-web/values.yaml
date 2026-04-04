@@ -1,6 +1,6 @@
 api:
   image:
-    repository: ghcr.io/recon-web/api
+    repository: ghcr.io/brunoafk/recon-web/api
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
@@ -17,7 +17,7 @@ api:
 
 web:
   image:
-    repository: ghcr.io/recon-web/web
+    repository: ghcr.io/brunoafk/recon-web/web
     tag: latest
     pullPolicy: IfNotPresent
   replicas: 1
@@ -41,7 +41,7 @@ scanner:
   schedule: "0 0 * * *"
   urls: []
   image:
-    repository: ghcr.io/recon-web/cli
+    repository: ghcr.io/brunoafk/recon-web/cli
     tag: latest
 
 notifications:

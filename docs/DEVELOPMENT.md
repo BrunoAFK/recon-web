@@ -20,10 +20,10 @@ npm install       # installs all workspace packages
 ## Running locally
 
 ```bash
-# Terminal 1 — API server on http://localhost:3000
+# Terminal 1 -API server on http://localhost:3000
 npm run dev
 
-# Terminal 2 — Frontend on http://localhost:5173 (proxies to API)
+# Terminal 2 -Frontend on http://localhost:5173 (proxies to API)
 npm run dev:web
 ```
 
@@ -36,7 +36,7 @@ The frontend dev server proxies `/api` requests to the API server automatically.
 ```
 recon-web/
 ├── packages/
-│   ├── core/           # @recon-web/core — shared handler library
+│   ├── core/           # @recon-web/core -shared handler library
 │   │   ├── src/
 │   │   │   ├── handlers/       # 33 analysis handlers (dns.ts, ssl.ts, ports.ts, ...)
 │   │   │   ├── utils/          # URL parsing, network validation, retry, diff
@@ -47,7 +47,7 @@ recon-web/
 │   │   │   └── index.ts        # Public exports
 │   │   └── package.json
 │   │
-│   ├── api/            # @recon-web/api — Fastify REST server
+│   ├── api/            # @recon-web/api -Fastify REST server
 │   │   ├── src/
 │   │   │   ├── index.ts        # Server entry point
 │   │   │   ├── server.ts       # Fastify setup (CORS, rate-limit, Swagger, auth, scheduler)
@@ -61,7 +61,7 @@ recon-web/
 │   │   ├── Dockerfile
 │   │   └── package.json
 │   │
-│   ├── cli/            # @recon-web/cli — Commander CLI
+│   ├── cli/            # @recon-web/cli -Commander CLI
 │   │   ├── src/
 │   │   │   ├── index.ts        # CLI entry + 33 auto-generated sub-commands
 │   │   │   ├── runner.ts       # run-all, run-single orchestration
@@ -70,7 +70,7 @@ recon-web/
 │   │   ├── Dockerfile
 │   │   └── package.json
 │   │
-│   ├── web/            # @recon-web/web — React SPA
+│   ├── web/            # @recon-web/web -React SPA
 │   │   ├── src/
 │   │   │   ├── App.tsx             # Router + auth/theme providers
 │   │   │   ├── pages/              # Home, Results, History, HistoryResults, Compare, Login, Settings
@@ -87,7 +87,7 @@ recon-web/
 │   │   ├── Dockerfile               # nginx reverse proxy
 │   │   └── package.json
 │   │
-│   └── static/         # @recon-web/static — Cloudflare Pages edge build
+│   └── static/         # @recon-web/static -Cloudflare Pages edge build
 │       └── functions/              # CF Workers for ~16 HTTP-only handlers
 │
 ├── helm/recon-web/     # Kubernetes Helm chart
@@ -262,8 +262,8 @@ Build context is always the repo root.
 
 SQLite with WAL mode. Two tables:
 
-- **scans** — `id, url, created_at, handler_count, status, duration_ms`
-- **scan_results** — `id, scan_id, handler, result (JSON), duration_ms`
+- **scans** -`id, url, created_at, handler_count, status, duration_ms`
+- **scan_results** -`id, scan_id, handler, result (JSON), duration_ms`
 
 Indices on `url`, `created_at DESC`, and `scan_id` for performance.
 
@@ -289,11 +289,11 @@ audit (deps) ──────┘
 | **quality** | Lint, typecheck, tests, dependency audit (Trivy fs scan) | Yes |
 | **build** | Docker multi-stage build for api, web, cli (in parallel) | Yes |
 | **scan** | Trivy container scan on each image (CRITICAL + HIGH) | Yes |
-| **push** | Tag as `:sha` + `:latest` and push to registry | — |
+| **push** | Tag as `:sha` + `:latest` and push to registry | -|
 
 ### How `:latest` stays safe
 
-Images are first tagged with the commit SHA (`:abc123`). Trivy scans that image. Only if the scan passes, the image is retagged as `:latest` and pushed. If Trivy fails, the pipeline stops — `:latest` on the registry remains pointing to the previous good build.
+Images are first tagged with the commit SHA (`:abc123`). Trivy scans that image. Only if the scan passes, the image is retagged as `:latest` and pushed. If Trivy fails, the pipeline stops -`:latest` on the registry remains pointing to the previous good build.
 
 ### Trigger rules
 
@@ -320,7 +320,7 @@ Images are first tagged with the commit SHA (`:abc123`). Trivy scans that image.
 
 #### GitHub (Settings → Secrets and variables → Actions)
 
-`GITHUB_TOKEN` is automatically available — no manual setup needed for GHCR push.
+`GITHUB_TOKEN` is automatically available -no manual setup needed for GHCR push.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
@@ -330,7 +330,7 @@ Optional: if you want Trivy results in the GitHub Security tab, ensure the repo 
 
 #### GitLab (Settings → CI/CD → Variables)
 
-`CI_REGISTRY_*` variables are automatically available — no manual setup needed for GitLab Container Registry.
+`CI_REGISTRY_*` variables are automatically available -no manual setup needed for GitLab Container Registry.
 
 | Variable | Required | Description |
 |----------|----------|-------------|

@@ -1,8 +1,8 @@
 # recon-web
 
-> **Early stage project** — under active development. APIs, configuration, and features may change without notice. Contributions and feedback are welcome.
+> **Early stage project** -under active development. APIs, configuration, and features may change without notice. Contributions and feedback are welcome.
 
-Scan any website and get a detailed analysis of its DNS, security, performance, and tech stack — from the web UI, REST API, or command line.
+Scan any website and get a detailed analysis of its DNS, security, performance, and tech stack -from the web UI, REST API, or command line.
 
 ---
 
@@ -10,11 +10,11 @@ Scan any website and get a detailed analysis of its DNS, security, performance, 
 
 recon-web runs **33 checks** against a target URL and presents the results in a clean, categorised dashboard. Checks include:
 
-- **Security** — SSL certificates, HSTS, security headers, firewalls, block lists, threats
-- **DNS** — A/AAAA/MX/NS/TXT records, DNSSEC, DNS-over-HTTPS
-- **Network** — open ports, HTTP headers, cookies, redirects, traceroute
-- **Content** — robots.txt, sitemap, social/meta tags, linked pages
-- **Meta** — WHOIS, domain ranking, tech stack detection, Wayback archives
+- **Security** -SSL certificates, HSTS, security headers, firewalls, block lists, threats
+- **DNS** -A/AAAA/MX/NS/TXT records, DNSSEC, DNS-over-HTTPS
+- **Network** -open ports, HTTP headers, cookies, redirects, traceroute
+- **Content** -robots.txt, sitemap, social/meta tags, linked pages
+- **Meta** -WHOIS, domain ranking, tech stack detection, Wayback archives
 
 Results are saved to history so you can compare scans over time.
 
@@ -31,7 +31,7 @@ The fastest way to get running. Requires only Docker.
 git clone https://github.com/BrunoAFK/recon-web.git
 cd recon-web
 
-# Configure (optional — works without any API keys)
+# Configure (optional -works without any API keys)
 cp .env.example .env
 
 # Start
@@ -40,8 +40,8 @@ docker compose up
 
 Open **http://localhost:8080** in your browser. That's it.
 
-- Port 8080 — Web UI
-- Port 3000 — REST API + Swagger docs at `/docs`
+- Port 8080 -Web UI
+- Port 3000 -REST API + Swagger docs at `/docs`
 
 ### Option 2: Run from source
 
@@ -50,10 +50,10 @@ Requires **Node.js 24+**.
 ```bash
 npm install
 
-# Terminal 1 — API server (http://localhost:3000)
+# Terminal 1 -API server (http://localhost:3000)
 npm run dev
 
-# Terminal 2 — Frontend (http://localhost:5173)
+# Terminal 2 -Frontend (http://localhost:5173)
 npm run dev:web
 ```
 
@@ -148,18 +148,23 @@ docker compose up
 ```
 
 Services:
-- **api** (port 3000) — Fastify + Chromium + SQLite
-- **web** (port 8080) — nginx serving React app + reverse proxy to API
+- **api** (port 3000) -Fastify + Chromium + SQLite
+- **web** (port 8080) -nginx serving React app + reverse proxy to API
 
 ### Docker Compose (pre-built images)
 
-Pulls images from GitHub Container Registry — no build needed:
+Pulls images from GitHub Container Registry -no build needed:
 
 ```bash
 cp .env.example .env
-export REGISTRY=ghcr.io/brunoafk/recon-web
-export TAG=latest
 docker compose -f docker-compose.remote.yml up
+```
+
+Available images:
+```bash
+docker pull ghcr.io/brunoafk/recon-web/api:latest
+docker pull ghcr.io/brunoafk/recon-web/web:latest
+docker pull ghcr.io/brunoafk/recon-web/cli:latest
 ```
 
 ### Kubernetes (Helm)
@@ -192,7 +197,7 @@ API_ORIGIN=https://your-api.example.com npm run build:static
 
 ## Configuration
 
-Copy `.env.example` to `.env`. All settings are optional — the app works out of the box.
+Copy `.env.example` to `.env`. All settings are optional -the app works out of the box.
 
 ### Authentication
 
@@ -251,4 +256,4 @@ If you want to contribute, fix bugs, or understand the codebase, see the [develo
 
 ## License
 
-GPL-2.0-only — see [LICENSE](LICENSE).
+GPL-2.0-only -see [LICENSE](LICENSE).
