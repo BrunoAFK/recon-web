@@ -80,7 +80,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       tags: ['meta'],
     },
   }, async () => {
-    return getHandlerNames().map((name) => ({
+    return getHandlerNames().map((name: string) => ({
       ...registry[name].metadata,
       ...getPresentationMetadata(name),
     }));

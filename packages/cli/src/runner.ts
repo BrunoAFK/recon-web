@@ -47,7 +47,7 @@ export async function runAll(rawUrl: string, options: RunOptions): Promise<void>
   let handlerNames = getHandlerNames();
   if (options.only) {
     const selected = options.only.split(',').map((s) => s.trim());
-    handlerNames = handlerNames.filter((name) => selected.includes(name));
+    handlerNames = handlerNames.filter((name: string) => selected.includes(name));
     if (handlerNames.length === 0) {
       console.error(pc.red('No matching handlers found. Available: ' + getHandlerNames().join(', ')));
       process.exit(1);
@@ -56,11 +56,11 @@ export async function runAll(rawUrl: string, options: RunOptions): Promise<void>
 
   // Skip Chromium-dependent handlers if no Chrome available
   const chromiumHandlers = handlerNames.filter(
-    (name) => registry[name]?.metadata.requiresChromium,
+    (name: string) => registry[name]?.metadata.requiresChromium,
   );
   if (chromiumHandlers.length > 0 && !config.chromePath) {
     handlerNames = handlerNames.filter(
-      (name) => !registry[name]?.metadata.requiresChromium,
+      (name: string) => !registry[name]?.metadata.requiresChromium,
     );
   }
 

@@ -106,7 +106,7 @@ export async function executeScan({
   const allNames = handlers ?? getHandlerNames();
   const hasScreenshot = allNames.includes('screenshot');
   const orderedHandlers = hasScreenshot
-    ? allNames.filter((name) => name !== 'screenshot').concat('screenshot')
+    ? allNames.filter((name: string) => name !== 'screenshot').concat('screenshot')
     : [...allNames];
 
   const scanId = createScan(db, { url, handlerCount: orderedHandlers.length });
@@ -180,7 +180,7 @@ export async function executeScan({
   };
 
   try {
-    await Promise.all(orderedHandlers.map((name) => limit(() => runOne(name))));
+    await Promise.all(orderedHandlers.map((name: string) => limit(() => runOne(name))));
 
     const durationMs = Date.now() - startedAt;
     updateScanStatus(db, scanId, 'completed', durationMs);
