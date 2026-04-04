@@ -258,6 +258,12 @@ Build context is always the repo root.
 
 ---
 
+## Releasing
+
+See [RELEASING.md](RELEASING.md) for how to create versioned releases with `./scripts/version`.
+
+---
+
 ## Database
 
 SQLite with WAL mode. Two tables:

@@ -120,10 +120,13 @@ jobs:
           VERSION_TAG="${{ github.ref_name }}"
           docker tag ${{ env.IMAGE_PREFIX }}/api:build-${{ github.run_id }} \
                      ${{ env.IMAGE_PREFIX }}/api:${VERSION_TAG}
-          docker tag ${{ env.IMAGE_PREFIX }}/api:build-${{ github.run_id }} \
-                     ${{ env.IMAGE_PREFIX }}/api:latest
           docker push ${{ env.IMAGE_PREFIX }}/api:${VERSION_TAG}
-          docker push ${{ env.IMAGE_PREFIX }}/api:latest
+          # Only tag :latest for stable releases (no alpha/beta/rc)
+          if [[ "${VERSION_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            docker tag ${{ env.IMAGE_PREFIX }}/api:build-${{ github.run_id }} \
+                       ${{ env.IMAGE_PREFIX }}/api:latest
+            docker push ${{ env.IMAGE_PREFIX }}/api:latest
+          fi
 
   docker-web:
     name: Docker — Web
@@ -166,10 +169,12 @@ jobs:
           VERSION_TAG="${{ github.ref_name }}"
           docker tag ${{ env.IMAGE_PREFIX }}/web:build-${{ github.run_id }} \
                      ${{ env.IMAGE_PREFIX }}/web:${VERSION_TAG}
-          docker tag ${{ env.IMAGE_PREFIX }}/web:build-${{ github.run_id }} \
-                     ${{ env.IMAGE_PREFIX }}/web:latest
           docker push ${{ env.IMAGE_PREFIX }}/web:${VERSION_TAG}
-          docker push ${{ env.IMAGE_PREFIX }}/web:latest
+          if [[ "${VERSION_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            docker tag ${{ env.IMAGE_PREFIX }}/web:build-${{ github.run_id }} \
+                       ${{ env.IMAGE_PREFIX }}/web:latest
+            docker push ${{ env.IMAGE_PREFIX }}/web:latest
+          fi
 
   docker-cli:
     name: Docker — CLI
@@ -212,7 +217,9 @@ jobs:
           VERSION_TAG="${{ github.ref_name }}"
           docker tag ${{ env.IMAGE_PREFIX }}/cli:build-${{ github.run_id }} \
                      ${{ env.IMAGE_PREFIX }}/cli:${VERSION_TAG}
-          docker tag ${{ env.IMAGE_PREFIX }}/cli:build-${{ github.run_id }} \
-                     ${{ env.IMAGE_PREFIX }}/cli:latest
           docker push ${{ env.IMAGE_PREFIX }}/cli:${VERSION_TAG}
-          docker push ${{ env.IMAGE_PREFIX }}/cli:latest
+          if [[ "${VERSION_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            docker tag ${{ env.IMAGE_PREFIX }}/cli:build-${{ github.run_id }} \
+                       ${{ env.IMAGE_PREFIX }}/cli:latest
+            docker push ${{ env.IMAGE_PREFIX }}/cli:latest
+          fi
