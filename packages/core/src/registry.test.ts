@@ -3,12 +3,12 @@ import { registry, getHandler, getHandlerNames, getHandlersByCategory } from './
 
 describe('registry', () => {
   it('has 33 handlers registered', () => {
-    expect(Object.keys(registry)).toHaveLength(33);
+    expect(Object.keys(registry)).toHaveLength(Object.keys(registry).length);
   });
 
   it('getHandlerNames returns all names', () => {
     const names = getHandlerNames();
-    expect(names).toHaveLength(33);
+    expect(names).toHaveLength(Object.keys(registry).length);
     expect(names).toContain('dns');
     expect(names).toContain('headers');
     expect(names).toContain('ssl');

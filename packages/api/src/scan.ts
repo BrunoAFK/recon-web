@@ -163,8 +163,10 @@ export async function executeScan({
   onEvent,
   signal,
 }: ExecuteScanOptions): Promise<{ scanId: string; results: Record<string, HandlerResult>; durationMs: number }> {
-  // Pre-flight reachability check
-  await checkUrlReachable(url, signal);
+  // Pre-flight reachability check (skip when running a targeted subset of handlers)
+  if (!handlers) {
+    await checkUrlReachable(url, signal);
+  }
 
   const allNames = handlers ?? getHandlerNames();
   const hasScreenshot = allNames.includes('screenshot');
