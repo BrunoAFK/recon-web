@@ -1,0 +1,162 @@
+stages:
+  - quality
+  - build
+  - scan
+  - push
+
+variables:
+  NODE_VERSION: "22"
+  REGISTRY: ${CI_REGISTRY}
+  IMAGE_PREFIX: ${CI_REGISTRY_IMAGE}
+  TRIVY_SEVERITY: CRITICAL,HIGH
+  TRIVY_VERSION: "0.58.1"
+  # Docker-in-Docker
+  DOCKER_HOST: tcp://docker:2376
+  DOCKER_TLS_CERTDIR: /certs
+  DOCKER_TLS_VERIFY: 1
+  DOCKER_CERT_PATH: $DOCKER_TLS_CERTDIR/client
+
+# ── Stage 1: Lint + Typecheck ──────────────────────────────────
+
+lint:
+  stage: quality
+  image: node:${NODE_VERSION}
+  cache:
+    key: npm-${CI_COMMIT_REF_SLUG}
+    paths:
+      - node_modules/
+  script:
+    - npm ci
+    - npm run lint
+    - npm run typecheck
+
+# ── Stage 2: Tests ─────────────────────────────────────────────
+
+test:
+  stage: quality
+  image: node:${NODE_VERSION}
+  cache:
+    key: npm-${CI_COMMIT_REF_SLUG}
+    paths:
+      - node_modules/
+  script:
+    - npm ci
+    - npm test
+
+# ── Stage 3: Dependency audit ──────────────────────────────────
+
+audit:
+  stage: quality
+  image:
+    name: aquasec/trivy:${TRIVY_VERSION}
+    entrypoint: [""]
+  script:
+    - trivy fs --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed .
+
+# ── Stage 4: Build Docker images ───────────────────────────────
+
+.docker-build:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  before_script:
+    - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
+
+build-api:
+  extends: .docker-build
+  script:
+    - docker build -f packages/api/Dockerfile -t ${IMAGE_PREFIX}/api:${CI_COMMIT_SHA} .
+    - docker save ${IMAGE_PREFIX}/api:${CI_COMMIT_SHA} > api-image.tar
+  artifacts:
+    paths:
+      - api-image.tar
+    expire_in: 1 hour
+
+build-web:
+  extends: .docker-build
+  script:
+    - docker build -f packages/web/Dockerfile -t ${IMAGE_PREFIX}/web:${CI_COMMIT_SHA} .
+    - docker save ${IMAGE_PREFIX}/web:${CI_COMMIT_SHA} > web-image.tar
+  artifacts:
+    paths:
+      - web-image.tar
+    expire_in: 1 hour
+
+build-cli:
+  extends: .docker-build
+  script:
+    - docker build -f packages/cli/Dockerfile -t ${IMAGE_PREFIX}/cli:${CI_COMMIT_SHA} .
+    - docker save ${IMAGE_PREFIX}/cli:${CI_COMMIT_SHA} > cli-image.tar
+  artifacts:
+    paths:
+      - cli-image.tar
+    expire_in: 1 hour
+
+# ── Stage 5: Trivy scan ───────────────────────────────────────
+
+.trivy-scan:
+  stage: scan
+  image:
+    name: aquasec/trivy:${TRIVY_VERSION}
+    entrypoint: [""]
+
+scan-api:
+  extends: .trivy-scan
+  needs: [build-api]
+  script:
+    - trivy image --input api-image.tar --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed --format table
+  allow_failure: false
+
+scan-web:
+  extends: .trivy-scan
+  needs: [build-web]
+  script:
+    - trivy image --input web-image.tar --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed --format table
+  allow_failure: false
+
+scan-cli:
+  extends: .trivy-scan
+  needs: [build-cli]
+  script:
+    - trivy image --input cli-image.tar --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed --format table
+  allow_failure: false
+
+# ── Stage 6: Push (only on main/master) ───────────────────────
+
+.docker-push:
+  stage: push
+  image: docker:27
+  services:
+    - docker:27-dind
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "master"
+  before_script:
+    - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
+
+push-api:
+  extends: .docker-push
+  needs: [scan-api, build-api]
+  script:
+    - docker load < api-image.tar
+    - docker tag ${IMAGE_PREFIX}/api:${CI_COMMIT_SHA} ${IMAGE_PREFIX}/api:latest
+    - docker push ${IMAGE_PREFIX}/api:${CI_COMMIT_SHA}
+    - docker push ${IMAGE_PREFIX}/api:latest
+
+push-web:
+  extends: .docker-push
+  needs: [scan-web, build-web]
+  script:
+    - docker load < web-image.tar
+    - docker tag ${IMAGE_PREFIX}/web:${CI_COMMIT_SHA} ${IMAGE_PREFIX}/web:latest
+    - docker push ${IMAGE_PREFIX}/web:${CI_COMMIT_SHA}
+    - docker push ${IMAGE_PREFIX}/web:latest
+
+push-cli:
+  extends: .docker-push
+  needs: [scan-cli, build-cli]
+  script:
+    - docker load < cli-image.tar
+    - docker tag ${IMAGE_PREFIX}/cli:${CI_COMMIT_SHA} ${IMAGE_PREFIX}/cli:latest
+    - docker push ${IMAGE_PREFIX}/cli:${CI_COMMIT_SHA}
+    - docker push ${IMAGE_PREFIX}/cli:latest

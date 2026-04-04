@@ -97,7 +97,6 @@ recon-web/
 │
 ├── @internal/          # Internal docs, reference projects, assets (not published)
 ├── docs/               # Documentation
-├── .github/workflows/  # CI/CD: test, build, docker, deploy
 ├── docker-compose.yml
 ├── docker-compose.remote.yml
 ├── .env.example
@@ -259,19 +258,6 @@ Build context is always the repo root.
 
 ---
 
-## CI/CD
-
-GitHub Actions workflows in `.github/workflows/`:
-
-| Workflow | Trigger | What it does |
-|----------|---------|-------------|
-| `ci.yml` | Push/PR | Lint, typecheck, test all packages |
-| `docker.yml` | Push to main | Build + push Docker images to GHCR |
-| `deploy-aws.yml` | Manual/tag | Deploy to AWS |
-| `credits.yml` | Manual | Update credits |
-
----
-
 ## Database
 
 SQLite with WAL mode. Two tables:
@@ -282,3 +268,94 @@ SQLite with WAL mode. Two tables:
 Indices on `url`, `created_at DESC`, and `scan_id` for performance.
 
 Path configurable via `DB_PATH` env var (default: `./data/recon-web.db`).
+
+---
+
+## CI/CD
+
+The project supports both **GitHub Actions** and **GitLab CI** with identical pipeline logic:
+
+```
+lint + typecheck ──┐
+                   ├──► build docker images (parallel) ──► trivy scan ──► push
+tests ─────────────┘
+audit (deps) ──────┘
+```
+
+### Pipeline stages
+
+| Stage | What it does | Blocks next? |
+|-------|-------------|-------------|
+| **quality** | Lint, typecheck, tests, dependency audit (Trivy fs scan) | Yes |
+| **build** | Docker multi-stage build for api, web, cli (in parallel) | Yes |
+| **scan** | Trivy container scan on each image (CRITICAL + HIGH) | Yes |
+| **push** | Tag as `:sha` + `:latest` and push to registry | — |
+
+### How `:latest` stays safe
+
+Images are first tagged with the commit SHA (`:abc123`). Trivy scans that image. Only if the scan passes, the image is retagged as `:latest` and pushed. If Trivy fails, the pipeline stops — `:latest` on the registry remains pointing to the previous good build.
+
+### Trigger rules
+
+| Event | What runs |
+|-------|-----------|
+| Push to `main`/`master` | Full pipeline: quality → build → scan → push |
+| Pull request / Merge request | Quality only: lint, typecheck, tests, audit |
+
+### Configuration files
+
+| File | Platform |
+|------|----------|
+| `.github/workflows/ci.yml` | GitHub Actions |
+| `.gitlab-ci.yml` | GitLab CI |
+
+### Registry
+
+| Platform | Registry | Image paths |
+|----------|----------|-------------|
+| GitHub | `ghcr.io` | `ghcr.io/<user>/recon-web/api`, `/web`, `/cli` |
+| GitLab | `registry.gitlab.com` | `registry.gitlab.com/<user>/recon-web/api`, `/web`, `/cli` |
+
+### Required CI/CD variables
+
+#### GitHub (Settings → Secrets and variables → Actions)
+
+`GITHUB_TOKEN` is automatically available — no manual setup needed for GHCR push.
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GITHUB_TOKEN` | Auto | Automatically provided, used for GHCR login and push |
+
+Optional: if you want Trivy results in the GitHub Security tab, ensure the repo has **Security → Code scanning** enabled (free for public repos).
+
+#### GitLab (Settings → CI/CD → Variables)
+
+`CI_REGISTRY_*` variables are automatically available — no manual setup needed for GitLab Container Registry.
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CI_REGISTRY` | Auto | GitLab Container Registry URL |
+| `CI_REGISTRY_USER` | Auto | Registry username (CI job token) |
+| `CI_REGISTRY_PASSWORD` | Auto | Registry password (CI job token) |
+| `CI_REGISTRY_IMAGE` | Auto | Base image path for this project |
+
+#### Optional variables (both platforms)
+
+These can be set as CI secrets if you want handlers to use them during test or scan:
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_CLOUD_API_KEY` | PageSpeed + Safe Browsing checks |
+| `CLOUDMERSIVE_API_KEY` | Malware scanning |
+| `BUILT_WITH_API_KEY` | Feature detection |
+| `TRANCO_API_KEY` | Domain ranking |
+
+### Trivy configuration
+
+Both pipelines use the same Trivy settings:
+
+- **Severity:** `CRITICAL,HIGH`
+- **Exit code:** `1` (pipeline fails on findings)
+- **Ignore unfixed:** `true` (skip vulnerabilities without patches)
+- **GitHub:** Results uploaded as SARIF to Security tab
+- **GitLab:** Results printed as table in job log
