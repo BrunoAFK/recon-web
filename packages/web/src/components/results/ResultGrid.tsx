@@ -1,7 +1,24 @@
-import { useMemo, useState } from "react";
-import { MinusCircle, Search, X } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import {
+  MinusCircle,
+  Search,
+  X,
+  Layers,
+  Activity,
+  LayoutGrid,
+  ArrowUpDown,
+  ChevronsUpDown,
+  Shield,
+  Globe2,
+  Network,
+  FileText,
+  Database,
+  Gauge,
+  ChevronDown,
+} from "lucide-react";
 import ResultCard from "./ResultCard";
 import { classifyError } from "./classify-error";
+import { getDefaultGroupBy, getDefaultSortBy, getDefaultStatusOrder, type GroupBy, type SortBy, type StatusOrder } from "@/hooks/use-preferences";
 import type {
   HandlerCategory,
   HandlerMetadata,
@@ -73,8 +90,11 @@ export default function ResultGrid({
 }: ResultGridProps) {
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<HandlerCategory | "all">("all");
-  type StatusFilter = "all" | "ok" | "issues" | "info" | "skipped";
   const [activeStatus, setActiveStatus] = useState<StatusFilter>("all");
+  const [groupBy, setGroupBy] = useState<GroupBy>(getDefaultGroupBy);
+  const [sortBy, setSortBy] = useState<SortBy>(getDefaultSortBy);
+  const [statusOrder, setStatusOrder] = useState<StatusOrder>(getDefaultStatusOrder);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const { normalHandlers, skippedHandlers } = useMemo(() => {
     const normal: HandlerMetadata[] = [];
@@ -112,10 +132,20 @@ export default function ResultGrid({
     return "all";
   }
 
+  function sortHandlers(list: HandlerMetadata[], sort: SortBy): HandlerMetadata[] {
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      const nameA = (a.displayName ?? a.name).toLowerCase();
+      const nameB = (b.displayName ?? b.name).toLowerCase();
+      return sort === "name-asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+    });
+    return sorted;
+  }
+
   const filteredNormalHandlers = useMemo(() => {
     const term = search.trim().toLowerCase();
 
-    return normalHandlers.filter((handler) => {
+    const filtered = normalHandlers.filter((handler) => {
       if (activeCategory !== "all" && handler.category !== activeCategory) return false;
       if (activeStatus !== "all" && getResultStatus(results[handler.name]) !== activeStatus) return false;
       if (!term) return true;
@@ -133,7 +163,9 @@ export default function ResultGrid({
 
       return haystack.includes(term);
     });
-  }, [activeCategory, activeStatus, normalHandlers, search, results]);
+
+    return sortHandlers(filtered, sortBy);
+  }, [activeCategory, activeStatus, normalHandlers, search, results, sortBy]);
 
   const filteredSkippedHandlers = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -174,27 +206,15 @@ export default function ResultGrid({
 
   return (
     <div className="space-y-10">
-      {liveStatus === "streaming" && progress && (
-        <div className="rounded-2xl border border-border/40 bg-surface/60 p-5 animate-fade-in">
-          <div className="flex items-center justify-between gap-4 mb-3">
-            <div>
-              <p className="text-[15px] font-semibold text-foreground" style={{ fontFamily: "var(--font-display)" }}>
-                Live scan in progress
-              </p>
-              <p className="text-sm text-muted mt-1">
-                {lastCompletedLabel
-                  ? `Last completed: ${lastCompletedLabel}`
-                  : "Waiting for the first completed check."}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="text-lg font-semibold tabular-nums text-foreground">
-                {completed} / {total}
-              </p>
-              <p className="text-sm text-muted">{progress.active} active now</p>
-            </div>
+      {isLoading && progress && total > 0 && (
+        <div className="rounded-xl border border-accent/20 bg-accent/5 p-4 animate-fade-in">
+          <div className="flex items-center justify-between gap-4 mb-2">
+            <p className="text-sm font-medium text-foreground">
+              Still scanning{lastCompletedLabel ? ` — ${lastCompletedLabel}` : ""}
+            </p>
+            <p className="text-sm text-muted tabular-nums">{completed}/{total}</p>
           </div>
-          <div className="h-2 rounded-full bg-border/30 overflow-hidden">
+          <div className="h-1.5 rounded-full bg-border/30 overflow-hidden">
             <div
               className="h-full rounded-full bg-accent transition-all duration-500 ease-out"
               style={{ width: total > 0 ? `${(completed / total) * 100}%` : "0%" }}
@@ -203,19 +223,8 @@ export default function ResultGrid({
         </div>
       )}
 
-      {liveStatus === "fallback-loading" && (
-        <div className="rounded-2xl border border-border/35 bg-surface/55 p-5 animate-fade-in">
-          <p className="text-[15px] font-semibold text-foreground" style={{ fontFamily: "var(--font-display)" }}>
-            Finalizing scan
-          </p>
-          <p className="mt-1 text-sm text-muted">
-            Live streaming is unavailable, so the page is waiting for the server to finish the full scan response.
-          </p>
-        </div>
-      )}
-
       {!isLoading && completed > 0 && (
-        <div className="flex flex-wrap items-center gap-6 animate-fade-in">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 animate-fade-in">
           <StatBadge label="Total" value={total} />
           <StatBadge label="OK" value={succeeded} color="text-success" />
           {durationMs != null && (
@@ -227,109 +236,183 @@ export default function ResultGrid({
         </div>
       )}
 
-      <section className="rounded-2xl border border-border/40 bg-surface/75 p-4 animate-fade-in">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
+      <section className="relative z-20 animate-fade-in">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Category dropdown */}
+          <FilterDropdown
+            icon={<Layers className="h-3.5 w-3.5" />}
+            label={activeCategory === "all" ? "Category" : CATEGORY_LABELS[activeCategory]}
+            active={activeCategory !== "all"}
+          >
+            <DropdownItem
+              label="All categories"
+              active={activeCategory === "all"}
+              onClick={() => setActiveCategory("all")}
+            />
+            <div className="my-1 border-t border-border/30" />
+            {CATEGORY_ORDER.map((cat) => {
+              const Icon = CATEGORY_ICONS[cat];
+              return (
+                <DropdownItem
+                  key={cat}
+                  icon={<Icon className="h-3.5 w-3.5" />}
+                  label={CATEGORY_LABELS[cat]}
+                  active={activeCategory === cat}
+                  onClick={() => setActiveCategory(cat)}
+                />
+              );
+            })}
+          </FilterDropdown>
+
+          {/* Status dropdown */}
+          <FilterDropdown
+            icon={<Activity className="h-3.5 w-3.5" />}
+            label={
+              activeStatus === "all"
+                ? "Status"
+                : activeStatus === "ok"
+                  ? `OK (${succeeded})`
+                  : activeStatus === "issues"
+                    ? `Issues (${siteIssues})`
+                    : activeStatus === "info"
+                      ? `Info (${infoCount})`
+                      : `Skipped (${skippedCount})`
+            }
+            active={activeStatus !== "all"}
+          >
+            <DropdownItem label="All statuses" active={activeStatus === "all"} onClick={() => setActiveStatus("all")} />
+            <div className="my-1 border-t border-border/30" />
+            <DropdownItem label={`OK (${succeeded})`} active={activeStatus === "ok"} onClick={() => setActiveStatus("ok")} />
+            <DropdownItem label={`Issues (${siteIssues})`} active={activeStatus === "issues"} onClick={() => setActiveStatus("issues")} />
+            <DropdownItem label={`Info (${infoCount})`} active={activeStatus === "info"} onClick={() => setActiveStatus("info")} />
+            <DropdownItem label={`Skipped (${skippedCount})`} active={activeStatus === "skipped"} onClick={() => setActiveStatus("skipped")} />
+          </FilterDropdown>
+
+          {/* Group by dropdown */}
+          <FilterDropdown
+            icon={<LayoutGrid className="h-3.5 w-3.5" />}
+            label={groupBy === "none" ? "Group" : groupBy === "category" ? "By Category" : "By Status"}
+            active={groupBy !== "none"}
+          >
+            <DropdownItem label="No grouping" active={groupBy === "none"} onClick={() => setGroupBy("none")} />
+            <div className="my-1 border-t border-border/30" />
+            <DropdownItem label="By Category" active={groupBy === "category"} onClick={() => setGroupBy("category")} />
+            <DropdownItem label="By Status" active={groupBy === "status"} onClick={() => setGroupBy("status")} />
+          </FilterDropdown>
+
+          {/* Sort dropdown — card name ordering */}
+          <FilterDropdown
+            icon={<ArrowUpDown className="h-3.5 w-3.5" />}
+            label={sortBy === "name-asc" ? "A → Z" : "Z → A"}
+            active={false}
+          >
+            <DropdownItem label="Name A → Z" active={sortBy === "name-asc"} onClick={() => setSortBy("name-asc")} />
+            <DropdownItem label="Name Z → A" active={sortBy === "name-desc"} onClick={() => setSortBy("name-desc")} />
+          </FilterDropdown>
+
+          {/* Status group order — only when grouped by status */}
+          {groupBy === "status" && (
+            <FilterDropdown
+              icon={<Activity className="h-3.5 w-3.5" />}
+              label={statusOrder === "ok-first" ? "OK first" : "Issues first"}
+              active={false}
+            >
+              <DropdownItem label="OK first" active={statusOrder === "ok-first"} onClick={() => setStatusOrder("ok-first")} />
+              <DropdownItem label="Issues first" active={statusOrder === "issues-first"} onClick={() => setStatusOrder("issues-first")} />
+            </FilterDropdown>
+          )}
+
+          {/* Collapse controls (only when grouped) */}
+          {groupBy !== "none" && (
             <button
               type="button"
-              onClick={() => setActiveCategory("all")}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                activeCategory === "all"
-                  ? "bg-accent text-background"
-                  : "border border-border/50 text-muted hover:text-foreground hover:border-border"
-              }`}
+              onClick={() => {
+                if (collapsedGroups.size > 0) {
+                  setCollapsedGroups(new Set());
+                } else {
+                  const allKeys = groupBy === "category"
+                    ? CATEGORY_ORDER.map(String)
+                    : ["ok", "issues", "info", "all"];
+                  setCollapsedGroups(new Set(allKeys));
+                }
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border/40 bg-surface/50 px-3 py-1.5 text-sm font-medium text-muted hover:text-foreground hover:border-border/60 transition-colors"
             >
-              All
+              <ChevronsUpDown className="h-3.5 w-3.5" />
+              {collapsedGroups.size > 0 ? "Expand all" : "Collapse all"}
             </button>
-            {CATEGORY_ORDER.map((category) => (
+          )}
+
+          {/* Search */}
+          <div className="relative flex-1 min-w-[180px] max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search"
+              className="w-full rounded-lg border border-border/40 bg-surface/50 py-1.5 pl-9 pr-8 text-sm text-foreground outline-none transition-colors placeholder:text-muted/60 focus:border-accent/50 focus:ring-1 focus:ring-accent/20"
+            />
+            {search && (
               <button
-                key={category}
                 type="button"
-                onClick={() => setActiveCategory(category)}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeCategory === category
-                    ? "bg-accent text-background"
-                    : "border border-border/50 text-muted hover:text-foreground hover:border-border"
-                }`}
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-foreground"
               >
-                {CATEGORY_LABELS[category]}
+                <X className="h-3.5 w-3.5" />
               </button>
-            ))}
+            )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {(
-              [
-                { key: "all", label: "All" },
-                { key: "ok", label: `OK (${succeeded})` },
-                { key: "issues", label: `Issues (${siteIssues})` },
-                { key: "info", label: `Info (${infoCount})` },
-                { key: "skipped", label: `Skipped (${skippedCount})` },
-              ] as const
-            ).map(({ key, label }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setActiveStatus(key)}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeStatus === key
-                    ? "bg-foreground/10 text-foreground ring-1 ring-foreground/20"
-                    : "text-muted hover:text-foreground"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex w-full items-center gap-2 lg:max-w-sm">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-              <input
-                type="search"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search checks"
-                className="w-full rounded-xl border border-border/50 bg-background/40 py-2 pl-9 pr-10 text-sm text-foreground outline-none transition-colors placeholder:text-muted focus:border-border"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-muted hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          </div>
+          {/* Count */}
+          <span className="text-sm text-muted ml-auto tabular-nums">
+            {filteredNormalHandlers.length + filteredSkippedHandlers.length}/{handlers.length}
+          </span>
         </div>
-
-        <p className="mt-3 text-sm text-muted">
-          Showing {filteredNormalHandlers.length + filteredSkippedHandlers.length} of {handlers.length} checks
-        </p>
       </section>
 
-      <div className="columns-1 gap-4 md:columns-2 xl:columns-3">
-        {filteredNormalHandlers.map((handler) => {
-          const idx = animIndex++;
-          return (
-            <div key={handler.name} className="mb-4 break-inside-avoid">
-              <ResultCard
-                name={handler.name}
-                displayName={handler.displayName}
-                category={handler.category}
-                description={handler.description}
-                shortDescription={handler.shortDescription}
-                result={results[handler.name]}
-                isLoading={isLoading && !results[handler.name]}
-                animDelay={idx * 30}
-                url={url}
-              />
-            </div>
-          );
-        })}
-      </div>
+      {groupBy === "none" ? (
+        <div className="columns-1 gap-4 md:columns-2 xl:columns-3">
+          {filteredNormalHandlers.map((handler) => {
+            const idx = animIndex++;
+            return (
+              <div key={handler.name} className="mb-4 break-inside-avoid">
+                <ResultCard
+                  name={handler.name}
+                  displayName={handler.displayName}
+                  category={handler.category}
+                  description={handler.description}
+                  shortDescription={handler.shortDescription}
+                  result={results[handler.name]}
+                  isLoading={isLoading && !results[handler.name]}
+                  animDelay={idx * 30}
+                  url={url}
+                />
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <GroupedCards
+          handlers={filteredNormalHandlers}
+          results={results}
+          isLoading={isLoading}
+          url={url}
+          groupBy={groupBy}
+          statusOrder={statusOrder}
+          getResultStatus={getResultStatus}
+          animIndexRef={{ current: animIndex }}
+          collapsedGroups={collapsedGroups}
+          onToggleGroup={(key) => {
+            setCollapsedGroups((prev) => {
+              const next = new Set(prev);
+              if (next.has(key)) next.delete(key);
+              else next.add(key);
+              return next;
+            });
+          }}
+        />
+      )}
 
       {filteredSkippedHandlers.length > 0 && (
         <section className="animate-fade-in">
@@ -366,6 +449,211 @@ export default function ResultGrid({
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+const CATEGORY_ICONS: Record<HandlerCategory, React.ComponentType<{ className?: string }>> = {
+  security: Shield,
+  dns: Globe2,
+  network: Network,
+  content: FileText,
+  meta: Database,
+  performance: Gauge,
+};
+
+function FilterDropdown({
+  icon,
+  label,
+  active,
+  children,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+          active
+            ? "border-accent/40 bg-accent/10 text-accent"
+            : "border-border/40 bg-surface/50 text-muted hover:text-foreground hover:border-border/60"
+        }`}
+      >
+        {icon}
+        {label}
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1.5 w-48 rounded-xl border border-border bg-surface p-1.5 shadow-xl z-[100] animate-fade-in">
+          {React.Children.map(children, (child) =>
+            React.isValidElement(child)
+              ? React.cloneElement(child as React.ReactElement<{ onClose?: () => void }>, {
+                  onClose: () => setOpen(false),
+                })
+              : child,
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DropdownItem({
+  label,
+  icon,
+  active,
+  onClick,
+  onClose,
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  active: boolean;
+  onClick: () => void;
+  onClose?: () => void;
+}) {
+  // Dividers don't have onClick
+  if (!onClick) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        onClick();
+        onClose?.();
+      }}
+      className={`w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm text-left transition-colors ${
+        active ? "bg-accent/10 text-accent font-medium" : "text-muted hover:text-foreground hover:bg-surface-light/40"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+type StatusFilter = "all" | "ok" | "issues" | "info" | "skipped";
+
+const STATUS_LABELS: Record<StatusFilter, string> = {
+  all: "Other",
+  ok: "OK",
+  issues: "Issues",
+  info: "Info",
+  skipped: "Skipped",
+};
+
+function GroupedCards({
+  handlers,
+  results,
+  isLoading,
+  url,
+  groupBy,
+  statusOrder,
+  getResultStatus,
+  animIndexRef,
+  collapsedGroups,
+  onToggleGroup,
+}: {
+  handlers: HandlerMetadata[];
+  results: Record<string, HandlerResultData>;
+  isLoading: boolean;
+  url?: string;
+  groupBy: "category" | "status";
+  statusOrder: StatusOrder;
+  getResultStatus: (r: HandlerResultData | undefined) => StatusFilter;
+  animIndexRef: { current: number };
+  collapsedGroups: Set<string>;
+  onToggleGroup: (key: string) => void;
+}) {
+  const groups = useMemo(() => {
+    const map = new Map<string, HandlerMetadata[]>();
+
+    if (groupBy === "category") {
+      for (const cat of CATEGORY_ORDER) {
+        const items = handlers.filter((h) => h.category === cat);
+        if (items.length > 0) map.set(cat, items);
+      }
+    } else {
+      const order: StatusFilter[] = statusOrder === "ok-first"
+        ? ["ok", "issues", "info", "all"]
+        : ["issues", "info", "ok", "all"];
+      for (const status of order) {
+        const items = handlers.filter((h) => getResultStatus(results[h.name]) === status);
+        if (items.length > 0) map.set(status, items);
+      }
+    }
+
+    return map;
+  }, [handlers, results, groupBy, statusOrder, getResultStatus]);
+
+  return (
+    <div className="space-y-8">
+      {Array.from(groups).map(([key, items]) => {
+        const Icon = groupBy === "category" ? CATEGORY_ICONS[key as HandlerCategory] : undefined;
+        const label = groupBy === "category"
+          ? CATEGORY_LABELS[key as HandlerCategory]
+          : STATUS_LABELS[key as StatusFilter];
+
+        const isCollapsed = collapsedGroups.has(key);
+
+        return (
+          <section key={key}>
+            <button
+              type="button"
+              onClick={() => onToggleGroup(key)}
+              className="flex items-center gap-2 mb-4 group w-full text-left"
+            >
+              <ChevronDown className={`h-4 w-4 text-muted transition-transform ${isCollapsed ? "-rotate-90" : ""}`} />
+              {Icon && <Icon className="h-5 w-5 text-accent" />}
+              <h2
+                className="text-lg font-semibold tracking-tight"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                {label}
+              </h2>
+              <span className="text-sm text-muted tabular-nums">{items.length}</span>
+            </button>
+            {!isCollapsed && (
+              <div className="columns-1 gap-4 md:columns-2 xl:columns-3">
+                {items.map((handler) => {
+                  const idx = animIndexRef.current++;
+                  return (
+                    <div key={handler.name} className="mb-4 break-inside-avoid">
+                      <ResultCard
+                        name={handler.name}
+                        displayName={handler.displayName}
+                        category={handler.category}
+                        description={handler.description}
+                        shortDescription={handler.shortDescription}
+                        result={results[handler.name]}
+                        isLoading={isLoading && !results[handler.name]}
+                        animDelay={idx * 30}
+                        url={url}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }

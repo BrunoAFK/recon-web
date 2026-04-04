@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import type { RendererProps } from "./types";
 
+import { AbuseIpdbRenderer } from "./AbuseIpdbRenderer";
 import { StatusRenderer } from "./StatusRenderer";
 import { GetIpRenderer } from "./GetIpRenderer";
 import { SslRenderer } from "./SslRenderer";
@@ -34,8 +35,14 @@ import { QualityRenderer } from "./QualityRenderer";
 import { TlsRenderer } from "./TlsRenderer";
 import { FeaturesRenderer } from "./FeaturesRenderer";
 import { LegacyRankRenderer } from "./LegacyRankRenderer";
+import { SeoRenderer } from "./SeoRenderer";
+import { ServerLocationRenderer } from "./ServerLocationRenderer";
+import { SslLabsRenderer } from "./SslLabsRenderer";
+import { VirusTotalRenderer } from "./VirusTotalRenderer";
+import { WordPressRenderer } from "./WordPressRenderer";
 
 export const rendererRegistry: Record<string, ComponentType<RendererProps>> = {
+  "abuse-ipdb": AbuseIpdbRenderer,
   status: StatusRenderer,
   "get-ip": GetIpRenderer,
   ssl: SslRenderer,
@@ -69,4 +76,9 @@ export const rendererRegistry: Record<string, ComponentType<RendererProps>> = {
   tls: TlsRenderer,
   features: FeaturesRenderer,
   "legacy-rank": LegacyRankRenderer,
+  seo: SeoRenderer,
+  "server-location": ServerLocationRenderer,
+  "ssl-labs": SslLabsRenderer,
+  virustotal: VirusTotalRenderer,
+  wordpress: WordPressRenderer,
 };

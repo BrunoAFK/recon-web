@@ -1,5 +1,6 @@
+import dns from 'dns/promises';
 import pLimit from 'p-limit';
-import { getHandlerNames, getPresentationMetadata, registry } from '@recon-web/core';
+import { getHandlerNames, getPresentationMetadata, normalizeUrl, extractHostname, registry } from '@recon-web/core';
 import type BetterSqlite3 from 'better-sqlite3';
 import type { HandlerOptions, HandlerResult } from '@recon-web/core';
 import {
@@ -94,6 +95,65 @@ async function emitEvent(
   }
 }
 
+/**
+ * Pre-flight check: verify the target URL is reachable before running
+ * the full scan. First resolves DNS (fast fail for non-existent domains),
+ * then does a quick HTTP HEAD to confirm the server responds.
+ */
+async function checkUrlReachable(
+  url: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const normalized = normalizeUrl(url);
+  const hostname = extractHostname(normalized);
+
+  // Step 1: DNS resolution (fails fast for non-existent domains, ~1-3s)
+  try {
+    await dns.lookup(hostname);
+  } catch {
+    throw new Error(
+      `Domain "${hostname}" does not exist or cannot be resolved. Check the URL and try again.`,
+    );
+  }
+
+  if (signal?.aborted) throw new Error('Scan aborted');
+
+  // Step 2: Quick HTTP check (server responds, ~5s timeout)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5_000);
+  const onAbort = () => controller.abort();
+  signal?.addEventListener('abort', onAbort, { once: true });
+
+  try {
+    const response = await fetch(normalized, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+    void response;
+  } catch (err) {
+    if (signal?.aborted) throw new Error('Scan aborted');
+    // HEAD might be blocked, try GET
+    try {
+      const getResponse = await fetch(normalized, {
+        method: 'GET',
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: { Range: 'bytes=0-0' },
+      });
+      void getResponse;
+    } catch {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Domain "${hostname}" resolved but the server is not responding: ${message}`,
+      );
+    }
+  } finally {
+    clearTimeout(timeoutId);
+    signal?.removeEventListener('abort', onAbort);
+  }
+}
+
 export async function executeScan({
   db,
   url,
@@ -103,6 +163,9 @@ export async function executeScan({
   onEvent,
   signal,
 }: ExecuteScanOptions): Promise<{ scanId: string; results: Record<string, HandlerResult>; durationMs: number }> {
+  // Pre-flight reachability check
+  await checkUrlReachable(url, signal);
+
   const allNames = handlers ?? getHandlerNames();
   const hasScreenshot = allNames.includes('screenshot');
   const orderedHandlers = hasScreenshot

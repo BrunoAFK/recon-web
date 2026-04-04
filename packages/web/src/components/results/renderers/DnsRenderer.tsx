@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Chip, CodeBlock, KeyValueTable, MiniTable, SectionLabel } from "./primitives";
+import { Chip, CodeBlock, KeyValueRow, KeyValueTable, MiniTable, SectionLabel } from "./primitives";
 import type { RendererProps } from "./types";
 
 interface DnsData {
@@ -26,27 +26,46 @@ export function DnsRenderer({ data }: RendererProps) {
   const dns = (data ?? {}) as DnsData;
   const [showAll, setShowAll] = useState(false);
 
-  const summary: { label: string; value: React.ReactNode }[] = [];
-  if (dns.A?.length) summary.push({ label: "IPv4", value: `${dns.A.length} record(s)` });
-  if (dns.AAAA?.length) summary.push({ label: "IPv6", value: `${dns.AAAA.length} record(s)` });
-  if (dns.MX?.length) summary.push({ label: "Mail", value: `${dns.MX.length} MX record(s)` });
-  if (dns.NS?.length) summary.push({ label: "Nameservers", value: `${dns.NS.length} host(s)` });
+  // Primary records always visible
+  const hasA = dns.A && dns.A.length > 0;
+  const hasAAAA = dns.AAAA && dns.AAAA.length > 0;
+  const hasMX = dns.MX && dns.MX.length > 0;
+  const hasNS = dns.NS && dns.NS.length > 0;
+
+  // Extended records behind toggle
+  const hasCNAME = dns.CNAME && dns.CNAME.length > 0;
+  const hasTXT = dns.TXT && dns.TXT.length > 0;
+  const hasSOA = !!dns.SOA;
+  const hasExtended = hasCNAME || hasTXT || hasSOA;
 
   return (
     <div className="space-y-4">
-      {summary.length > 0 && <KeyValueTable items={summary} />}
+      {/* A record — inline if single, list if multiple */}
+      {hasA && (
+        dns.A!.length === 1 ? (
+          <KeyValueRow label="A" value={dns.A![0].address} />
+        ) : (
+          <div>
+            <SectionLabel>A Records</SectionLabel>
+            {dns.A!.map((r) => (
+              <p key={r.address} className="text-sm text-foreground ml-1 py-0.5">{r.address}</p>
+            ))}
+          </div>
+        )
+      )}
 
-      {dns.A && dns.A.length > 0 && (
+      {/* AAAA */}
+      {hasAAAA && (
         <div>
-          <SectionLabel>A Records</SectionLabel>
-          <MiniTable
-            columns={[{ key: "address", label: "Address" }]}
-            rows={dns.A.map((record) => ({ address: record.address }))}
-          />
+          <SectionLabel>AAAA</SectionLabel>
+          {dns.AAAA!.map((v) => (
+            <p key={v} className="text-sm text-foreground ml-1 py-0.5 break-all">{v}</p>
+          ))}
         </div>
       )}
 
-      {dns.MX && dns.MX.length > 0 && (
+      {/* MX */}
+      {hasMX && (
         <div>
           <SectionLabel>MX Records</SectionLabel>
           <MiniTable
@@ -54,83 +73,76 @@ export function DnsRenderer({ data }: RendererProps) {
               { key: "exchange", label: "Exchange" },
               { key: "priority", label: "Priority" },
             ]}
-            rows={dns.MX.map((record) => ({
-              exchange: record.exchange,
-              priority: String(record.priority),
+            rows={dns.MX!.map((r) => ({
+              exchange: r.exchange,
+              priority: String(r.priority),
             }))}
           />
         </div>
       )}
 
-      {dns.NS && dns.NS.length > 0 && (
+      {/* Nameservers */}
+      {hasNS && (
         <div>
           <SectionLabel>Nameservers</SectionLabel>
           <div className="mt-2 flex flex-wrap gap-2">
-            {dns.NS.map((server) => (
-              <Chip key={server} label={server} />
+            {dns.NS!.map((s) => (
+              <Chip key={s} label={s} />
             ))}
           </div>
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => setShowAll((value) => !value)}
-        className="text-sm text-muted hover:text-foreground"
-      >
-        {showAll ? "Hide extended records ▲" : "Show extended records ▼"}
-      </button>
+      {/* Toggle for extended records */}
+      {hasExtended && (
+        <>
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className="text-sm text-muted hover:text-foreground"
+          >
+            {showAll ? "Hide extended records \u25b2" : "Show extended records \u25bc"}
+          </button>
 
-      {showAll && (
-        <div className="space-y-4">
-          {dns.AAAA && dns.AAAA.length > 0 && (
-            <div>
-              <SectionLabel>AAAA Records</SectionLabel>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {dns.AAAA.map((value) => (
-                  <Chip key={value} label={value} />
-                ))}
-              </div>
+          {showAll && (
+            <div className="space-y-4">
+              {hasCNAME && (
+                <div>
+                  <SectionLabel>CNAME</SectionLabel>
+                  {dns.CNAME!.map((v) => (
+                    <p key={v} className="text-sm text-foreground ml-1 py-0.5 break-all">{v}</p>
+                  ))}
+                </div>
+              )}
+
+              {hasTXT && (
+                <div>
+                  <SectionLabel>TXT Records</SectionLabel>
+                  <div className="space-y-2 mt-1">
+                    {dns.TXT!.map((entry, i) => (
+                      <CodeBlock key={i}>{entry.join("")}</CodeBlock>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {hasSOA && (
+                <div>
+                  <SectionLabel>SOA Record</SectionLabel>
+                  <KeyValueTable
+                    items={[
+                      { label: "Primary NS", value: dns.SOA!.nsname },
+                      { label: "Hostmaster", value: dns.SOA!.hostmaster },
+                      { label: "Serial", value: String(dns.SOA!.serial) },
+                      { label: "Refresh", value: String(dns.SOA!.refresh) },
+                      { label: "Retry", value: String(dns.SOA!.retry) },
+                    ]}
+                  />
+                </div>
+              )}
             </div>
           )}
-
-          {dns.TXT && dns.TXT.length > 0 && (
-            <div>
-              <SectionLabel>TXT Records</SectionLabel>
-              <div className="space-y-2">
-                {dns.TXT.map((entry, index) => (
-                  <CodeBlock key={index}>{entry.join("")}</CodeBlock>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {dns.CNAME && dns.CNAME.length > 0 && (
-            <div>
-              <SectionLabel>CNAME Records</SectionLabel>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {dns.CNAME.map((value) => (
-                  <Chip key={value} label={value} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {dns.SOA && (
-            <div>
-              <SectionLabel>SOA Record</SectionLabel>
-              <KeyValueTable
-                items={[
-                  { label: "Primary NS", value: dns.SOA.nsname },
-                  { label: "Hostmaster", value: dns.SOA.hostmaster },
-                  { label: "Serial", value: String(dns.SOA.serial) },
-                  { label: "Refresh", value: String(dns.SOA.refresh) },
-                  { label: "Retry", value: String(dns.SOA.retry) },
-                ]}
-              />
-            </div>
-          )}
-        </div>
+        </>
       )}
     </div>
   );

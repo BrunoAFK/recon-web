@@ -206,7 +206,7 @@ export default function Compare() {
       {scanA.data && scanB.data && (
         <>
           {/* Scan headers */}
-          <div className="grid grid-cols-2 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
             <div className="rounded-xl border border-border/50 bg-surface/50 p-4">
               <div className="text-xs text-muted uppercase tracking-wider mb-1">Scan A (older)</div>
               <div className="text-sm font-medium truncate">{scanA.data.url}</div>
@@ -292,8 +292,9 @@ export default function Compare() {
 
                   {isOpen && hasDetails && (
                     <div className="px-4 pb-4 pt-0">
-                      <div className="rounded-lg bg-background/50 border border-border/30 overflow-hidden">
-                        <table className="w-full text-sm">
+                      <div className="rounded-lg bg-background/50 border border-border/30 overflow-x-auto">
+                        {/* Desktop: table layout */}
+                        <table className="w-full text-sm hidden sm:table">
                           <thead>
                             <tr className="border-b border-border/30 text-xs text-muted">
                               <th className="text-left px-3 py-2 font-medium w-1/5">Field</th>
@@ -319,6 +320,29 @@ export default function Compare() {
                             ))}
                           </tbody>
                         </table>
+
+                        {/* Mobile: stacked layout */}
+                        <div className="sm:hidden divide-y divide-border/20">
+                          {diff.fields.map((f, i) => (
+                            <div key={i} className="p-3 space-y-2">
+                              <p className="text-xs font-medium text-muted uppercase tracking-wider">{f.field}</p>
+                              <div className="space-y-1.5">
+                                <div>
+                                  <span className="text-[10px] text-muted uppercase">A: </span>
+                                  <pre className="inline whitespace-pre-wrap text-xs text-red-300/80 break-all">
+                                    {stringify(f.oldValue)}
+                                  </pre>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-muted uppercase">B: </span>
+                                  <pre className="inline whitespace-pre-wrap text-xs text-emerald-300/80 break-all">
+                                    {stringify(f.newValue)}
+                                  </pre>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   )}

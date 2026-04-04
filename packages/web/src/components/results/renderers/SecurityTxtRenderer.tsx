@@ -1,4 +1,4 @@
-import { CodeBlock, KeyValueTable, StatusDot, ChecklistItem } from "./primitives";
+import { ChecklistItem, CodeBlock, KeyValueTable, Verdict } from "./primitives";
 import type { RendererProps } from "./types";
 
 interface SecurityTxtData {
@@ -13,6 +13,8 @@ export function SecurityTxtRenderer({ data }: RendererProps) {
   const d = data as SecurityTxtData | undefined;
   if (!d || typeof d !== "object") return null;
 
+  const present = d.isPresent ?? false;
+
   // If fields object exists, show as key-value table
   if (d.fields && typeof d.fields === "object") {
     const items = Object.entries(d.fields)
@@ -21,12 +23,13 @@ export function SecurityTxtRenderer({ data }: RendererProps) {
       .map(([k, v]) => ({ label: k, value: String(v) }));
 
     return (
-      <div>
-        <StatusDot
-          status={d.isPresent ? "pass" : "fail"}
-          label={d.isPresent ? "Present" : "Not found"}
+      <div className="space-y-3">
+        <Verdict
+          label="security.txt Present?"
+          passed={present}
+          description={present ? undefined : "No security.txt file found. Security researchers won't know how to report vulnerabilities."}
         />
-        {d.isPgpSigned != null && (
+        {present && d.isPgpSigned != null && (
           <ChecklistItem label="PGP Signed" passed={d.isPgpSigned} />
         )}
         {items.length > 0 && <KeyValueTable items={items} />}
@@ -37,23 +40,19 @@ export function SecurityTxtRenderer({ data }: RendererProps) {
   // If content is a string, show in code block
   if (typeof d.content === "string" && d.content.length > 0) {
     return (
-      <div>
-        <StatusDot
-          status={d.isPresent ? "pass" : "fail"}
-          label={d.isPresent ? "Present" : "Not found"}
-        />
-        <div className="mt-2">
-          <CodeBlock>{d.content.length > 500 ? d.content.slice(0, 500) + "..." : d.content}</CodeBlock>
-        </div>
+      <div className="space-y-3">
+        <Verdict label="security.txt Present?" passed={present} />
+        <CodeBlock>{d.content.length > 500 ? d.content.slice(0, 500) + "..." : d.content}</CodeBlock>
       </div>
     );
   }
 
-  // Fallback: just show presence
+  // Fallback: just show verdict
   return (
-    <StatusDot
-      status={d.isPresent ? "pass" : "fail"}
-      label={d.isPresent ? "Present" : "Not found"}
+    <Verdict
+      label="security.txt Present?"
+      passed={present}
+      description={present ? undefined : "No security.txt file found at /.well-known/security.txt or /security.txt."}
     />
   );
 }

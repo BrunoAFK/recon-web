@@ -274,7 +274,7 @@ export default function ResultCard({
         className={`rounded-2xl border p-5 transition-all duration-300 animate-fade-in ${getSurfaceClasses(state)}`}
         style={{ animationDelay: `${animDelay}ms` }}
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2.5 flex-wrap">
               <StateIcon state={state} />
@@ -289,15 +289,6 @@ export default function ResultCard({
               </span>
               <span className="text-[12px] font-medium text-muted">{getStateLabel(state)}</span>
             </div>
-
-            <p className="mt-2 text-[15px] leading-6 text-muted">
-              {summaryText}
-            </p>
-            {redirectLabel && (
-              <p className="mt-2 text-[12px] font-medium text-muted">
-                {redirectLabel}
-              </p>
-            )}
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
@@ -329,6 +320,15 @@ export default function ResultCard({
             )}
           </div>
         </div>
+
+        <p className="mt-2 text-[15px] leading-6 text-muted">
+          {summaryText}
+        </p>
+        {redirectLabel && (
+          <p className="mt-1 text-[12px] font-medium text-muted">
+            {redirectLabel}
+          </p>
+        )}
 
         <div className="mt-4">
           {state === "loading" ? (
