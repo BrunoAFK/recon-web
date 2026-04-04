@@ -28,7 +28,7 @@ The fastest way to get running. Requires only Docker.
 
 ```bash
 # Clone the repo
-git clone https://github.com/user/recon-web.git
+git clone https://github.com/BrunoAFK/recon-web.git
 cd recon-web
 
 # Configure (optional — works without any API keys)
@@ -157,7 +157,7 @@ Pulls images from GitHub Container Registry — no build needed:
 
 ```bash
 cp .env.example .env
-export REGISTRY=ghcr.io/youruser/recon-web
+export REGISTRY=ghcr.io/brunoafk/recon-web
 export TAG=latest
 docker compose -f docker-compose.remote.yml up
 ```

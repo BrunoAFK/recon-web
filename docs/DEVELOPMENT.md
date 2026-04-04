@@ -313,7 +313,7 @@ Images are first tagged with the commit SHA (`:abc123`). Trivy scans that image.
 
 | Platform | Registry | Image paths |
 |----------|----------|-------------|
-| GitHub | `ghcr.io` | `ghcr.io/<user>/recon-web/api`, `/web`, `/cli` |
+| GitHub | `ghcr.io` | `ghcr.io/brunoafk/recon-web/api`, `/web`, `/cli` |
 | GitLab | `registry.gitlab.com` | `registry.gitlab.com/<user>/recon-web/api`, `/web`, `/cli` |
 
 ### Required CI/CD variables
