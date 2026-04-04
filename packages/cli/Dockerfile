@@ -2,7 +2,8 @@
 # Build context must be the repo root: docker build -f packages/cli/Dockerfile .
 
 # ── Build stage ───────────────────────────────────────────
-FROM node:22-bookworm AS build
+# node:24.14.1-bookworm
+FROM node@sha256:bb20cf73b3ad7212834ec48e2174cdcb5775f6550510a5336b842ae32741ce6c AS build
 
 WORKDIR /app
 
@@ -23,7 +24,8 @@ COPY packages/cli/src/ packages/cli/src/
 RUN npx tsc -b packages/core packages/cli
 
 # ── Runtime stage ─────────────────────────────────────────
-FROM node:22-bookworm-slim AS runtime
+# node:24.14.1-alpine3.23
+FROM node@sha256:01743339035a5c3c11a373cd7c83aeab6ed1457b55da6a69e014a95ac4e4700b AS runtime
 
 WORKDIR /app
 

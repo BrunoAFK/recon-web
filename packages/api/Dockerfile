@@ -2,7 +2,8 @@
 # Build context must be the repo root: docker build -f packages/api/Dockerfile .
 
 # ── Build stage ───────────────────────────────────────────
-FROM node:22-bookworm AS build
+# node:24.14.1-bookworm
+FROM node@sha256:bb20cf73b3ad7212834ec48e2174cdcb5775f6550510a5336b842ae32741ce6c AS build
 
 WORKDIR /app
 
@@ -23,7 +24,8 @@ COPY packages/api/src/ packages/api/src/
 RUN npx tsc -b packages/core packages/api
 
 # ── Runtime stage ─────────────────────────────────────────
-FROM node:22-bookworm-slim AS runtime
+# node:24.14.1-bookworm-slim
+FROM node@sha256:06e5c9f86bfa0aaa7163cf37a5eaa8805f16b9acb48e3f85645b09d459fc2a9f AS runtime
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \

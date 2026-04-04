@@ -45,7 +45,7 @@ Open **http://localhost:8080** in your browser. That's it.
 
 ### Option 2: Run from source
 
-Requires **Node.js 22+**.
+Requires **Node.js 24+**.
 
 ```bash
 npm install

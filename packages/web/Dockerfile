@@ -2,7 +2,8 @@
 # Build context must be the repo root: docker build -f packages/web/Dockerfile .
 
 # ── Build stage ───────────────────────────────────────────
-FROM node:22-bookworm AS build
+# node:24.14.1-bookworm
+FROM node@sha256:bb20cf73b3ad7212834ec48e2174cdcb5775f6550510a5336b842ae32741ce6c AS build
 
 WORKDIR /app
 
@@ -29,7 +30,8 @@ RUN npx tsc -b packages/core
 RUN npm run build --workspace=@recon-web/web
 
 # ── Runtime stage ─────────────────────────────────────────
-FROM nginx:alpine AS runtime
+# nginx:1.29.7-alpine3.23
+FROM nginx@sha256:e7257f1ef28ba17cf7c248cb8ccf6f0c6e0228ab9c315c152f9c203cd34cf6d1 AS runtime
 
 COPY --from=build /app/packages/web/dist /usr/share/nginx/html
 COPY packages/web/nginx.conf.template /etc/nginx/templates/default.conf.template

@@ -5,11 +5,11 @@ stages:
   - push
 
 variables:
-  NODE_VERSION: "22"
+  NODE_VERSION: "24"
   REGISTRY: ${CI_REGISTRY}
   IMAGE_PREFIX: ${CI_REGISTRY_IMAGE}
   TRIVY_SEVERITY: CRITICAL,HIGH
-  TRIVY_VERSION: "0.58.1"
+  TRIVY_IMAGE: aquasec/trivy@sha256:bcc376de8d77cfe086a917230e818dc9f8528e3c852f7b1aff648949b6258d1c
   # Docker-in-Docker
   DOCKER_HOST: tcp://docker:2376
   DOCKER_TLS_CERTDIR: /certs
@@ -48,7 +48,7 @@ test:
 audit:
   stage: quality
   image:
-    name: aquasec/trivy:${TRIVY_VERSION}
+    name: ${TRIVY_IMAGE}
     entrypoint: [""]
   script:
     - trivy fs --severity ${TRIVY_SEVERITY} --exit-code 1 --ignore-unfixed .
@@ -98,7 +98,7 @@ build-cli:
 .trivy-scan:
   stage: scan
   image:
-    name: aquasec/trivy:${TRIVY_VERSION}
+    name: ${TRIVY_IMAGE}
     entrypoint: [""]
 
 scan-api:

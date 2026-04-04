@@ -6,7 +6,7 @@ Everything you need to know to work on recon-web.
 
 ## Prerequisites
 
-- **Node.js 22+** (LTS)
+- **Node.js 24+** (LTS)
 - **npm** (comes with Node)
 - **Docker** (optional, for container builds)
 
