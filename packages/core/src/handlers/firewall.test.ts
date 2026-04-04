@@ -1,0 +1,88 @@
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { http, HttpResponse } from 'msw';
+import { setupServer } from 'msw/node';
+import { firewallHandler } from './firewall.js';
+
+const server = setupServer();
+
+beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
+describe('firewallHandler', () => {
+  it('detects Cloudflare WAF from server header', async () => {
+    server.use(
+      http.get('https://mock-site.test/', () => {
+        return new HttpResponse('OK', {
+          status: 200,
+          headers: { server: 'cloudflare' },
+        });
+      }),
+    );
+
+    const result = await firewallHandler('https://mock-site.test');
+    expect(result).toHaveProperty('data');
+    expect(result.data!.hasWaf).toBe(true);
+    expect(result.data!.waf).toBe('Cloudflare');
+  });
+
+  it('detects Akamai WAF from server header', async () => {
+    server.use(
+      http.get('https://mock-site.test/', () => {
+        return new HttpResponse('OK', {
+          status: 200,
+          headers: { server: 'AkamaiGHost' },
+        });
+      }),
+    );
+
+    const result = await firewallHandler('https://mock-site.test');
+    expect(result).toHaveProperty('data');
+    expect(result.data!.hasWaf).toBe(true);
+    expect(result.data!.waf).toBe('Akamai');
+  });
+
+  it('detects Sucuri WAF from custom header', async () => {
+    server.use(
+      http.get('https://mock-site.test/', () => {
+        return new HttpResponse('OK', {
+          status: 200,
+          headers: { 'x-sucuri-id': '12345' },
+        });
+      }),
+    );
+
+    const result = await firewallHandler('https://mock-site.test');
+    expect(result).toHaveProperty('data');
+    expect(result.data!.hasWaf).toBe(true);
+    expect(result.data!.waf).toBe('Sucuri CloudProxy WAF');
+  });
+
+  it('returns hasWaf false when no WAF is detected', async () => {
+    server.use(
+      http.get('https://mock-site.test/', () => {
+        return new HttpResponse('OK', {
+          status: 200,
+          headers: { server: 'nginx' },
+        });
+      }),
+    );
+
+    const result = await firewallHandler('https://mock-site.test');
+    expect(result).toHaveProperty('data');
+    expect(result.data!.hasWaf).toBe(false);
+    expect(result.data!.waf).toBeUndefined();
+  });
+
+  it('returns error on network failure', async () => {
+    server.use(
+      http.get('https://mock-site.test/', () => {
+        return HttpResponse.error();
+      }),
+    );
+
+    const result = await firewallHandler('https://mock-site.test');
+    expect(result).toHaveProperty('error');
+    expect(typeof result.error).toBe('string');
+  });
+});

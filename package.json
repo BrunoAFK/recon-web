@@ -1,0 +1,22 @@
+{
+  "name": "recon-web",
+  "private": true,
+  "version": "1.0.0",
+  "license": "GPL-2.0-only",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace=@recon-web/api",
+    "dev:web": "npm run dev --workspace=@recon-web/web",
+    "build": "npm run build -w @recon-web/core && npm run build -w @recon-web/api && npm run build -w @recon-web/cli && npm run build -w @recon-web/web && npm run build -w @recon-web/static",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build:static": "npm run build -w @recon-web/web && npm run build -w @recon-web/static"
+  }
+}

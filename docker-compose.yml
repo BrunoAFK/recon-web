@@ -1,0 +1,42 @@
+# Local build — builds images from source.
+# Usage: docker compose up
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: packages/api/Dockerfile
+    ports:
+      - "${API_PORT:-3000}:3000"
+    env_file: .env
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - scan-data:/app/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+
+  web:
+    build:
+      context: .
+      dockerfile: packages/web/Dockerfile
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      - API_UPSTREAM=http://api:3000
+
+  cli:
+    build:
+      context: .
+      dockerfile: packages/cli/Dockerfile
+    env_file: .env
+    profiles: ["cli"]
+
+volumes:
+  scan-data:

@@ -1,0 +1,29 @@
+{{- if .Values.scanner.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-scanner
+  labels:
+    app.kubernetes.io/name: recon-web
+    app.kubernetes.io/component: scanner
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  schedule: {{ .Values.scanner.schedule | quote }}
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            {{- range .Values.scanner.urls }}
+            - name: scan-{{ . | replace "." "-" | replace ":" "-" | replace "/" "-" | trunc 50 }}
+              image: "{{ $.Values.scanner.image.repository }}:{{ $.Values.scanner.image.tag }}"
+              args: ["scan", {{ . | quote }}, "--json"]
+              envFrom:
+                - configMapRef:
+                    name: {{ $.Release.Name }}-config
+                - secretRef:
+                    name: {{ $.Release.Name }}-secret
+            {{- end }}
+{{- end }}

@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  labels:
+    app.kubernetes.io/name: recon-web
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  NODE_ENV: "production"
+  HOST: "0.0.0.0"
+  PORT: "3000"
+  MAX_CONCURRENCY: {{ .Values.api.env.MAX_CONCURRENCY | default "8" | quote }}
+  AUTH_ENABLED: {{ .Values.auth.enabled | quote }}
+  {{- if .Values.scanner.enabled }}
+  SCHEDULE_ENABLED: "true"
+  SCHEDULE_CRON: {{ .Values.scanner.schedule | quote }}
+  SCHEDULE_URLS: {{ join "," .Values.scanner.urls | quote }}
+  {{- end }}
+  {{- if .Values.notifications.telegram.enabled }}
+  TELEGRAM_CHAT_ID: {{ .Values.notifications.telegram.chatId | quote }}
+  {{- end }}
+  {{- if .Values.notifications.email.enabled }}
+  SMTP_HOST: {{ .Values.notifications.email.smtpHost | quote }}
+  SMTP_PORT: {{ .Values.notifications.email.smtpPort | quote }}
+  NOTIFY_EMAIL: {{ .Values.notifications.email.notifyEmail | quote }}
+  {{- end }}

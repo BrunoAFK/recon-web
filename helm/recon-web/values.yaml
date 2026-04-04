@@ -1,0 +1,68 @@
+api:
+  image:
+    repository: ghcr.io/recon-web/api
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  env: {}
+    # GOOGLE_CLOUD_API_KEY: ""
+    # MAX_CONCURRENCY: "8"
+
+web:
+  image:
+    repository: ghcr.io/recon-web/web
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+ingress:
+  enabled: false
+  className: ""
+  host: recon.example.com
+  tls: false
+  annotations: {}
+
+scanner:
+  enabled: false
+  schedule: "0 0 * * *"
+  urls: []
+  image:
+    repository: ghcr.io/recon-web/cli
+    tag: latest
+
+notifications:
+  telegram:
+    enabled: false
+    botToken: ""
+    chatId: ""
+  email:
+    enabled: false
+    smtpHost: ""
+    smtpPort: "587"
+    smtpUser: ""
+    smtpPass: ""
+    notifyEmail: ""
+
+auth:
+  enabled: false
+  token: ""
+
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+  accessMode: ReadWriteOnce

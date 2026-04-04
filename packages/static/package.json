@@ -1,0 +1,13 @@
+{
+  "name": "@recon-web/static",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.js",
+    "preview": "npx wrangler pages dev dist"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}

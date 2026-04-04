@@ -1,0 +1,39 @@
+# Environment
+.env
+.env.local
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Legacy
+.astro/
+.vercel/
+.netlify/
+.claude
+
+# Internal
+@internal/

@@ -1,0 +1,43 @@
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Proxy API requests to the API service
+    # Exact match for /api (scan all handlers: GET /api?url=...)
+    location = /api {
+        proxy_pass ${API_UPSTREAM}/api;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Prefix match for /api/ (individual handlers, history, etc.)
+    location /api/ {
+        proxy_pass ${API_UPSTREAM}/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Health check proxy
+    location = /health {
+        proxy_pass ${API_UPSTREAM}/health;
+        proxy_set_header Host $host;
+    }
+
+    # Swagger docs proxy
+    location /docs {
+        proxy_pass ${API_UPSTREAM}/docs;
+        proxy_set_header Host $host;
+    }
+
+    # SPA fallback (must be last)
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
