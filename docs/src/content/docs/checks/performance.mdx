@@ -1,0 +1,60 @@
+---
+title: Performance Checks
+description: "2 performance checks: carbon footprint and PageSpeed"
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+recon-web runs 2 performance checks that measure the environmental impact and overall quality of the site using industry-standard methodologies.
+
+---
+
+## Carbon Footprint
+
+**Handler:** `carbon`
+
+Estimates the website's carbon footprint per page view based on data transfer size. Uses the Sustainable Web Design methodology to calculate CO2 emissions from three sources: hosting infrastructure, network data transfer, and end-user device energy consumption. Also checks whether the hosting provider uses green (renewable) energy.
+
+**Why it matters:** The internet accounts for roughly 2-4% of global carbon emissions. Heavy websites are not only bad for the environment but also slow for users, especially on mobile networks. Optimizing for lower carbon footprint naturally improves performance.
+
+**Good result:** Small page weight (under 1 MB transferred), low CO2 estimate (under 0.5g per page view), and green hosting detected.
+
+**Bad result:** Heavy page (over 3 MB), high CO2 estimate, or non-green hosting. The average website produces about 0.5g of CO2 per page view — sites with unoptimized images and excessive JavaScript can be 5-10x worse.
+
+<Aside type="tip">
+  Images are usually the biggest contributor to both page weight and carbon emissions. Converting to modern formats (WebP, AVIF) and properly sizing images is the single most impactful optimization.
+</Aside>
+
+---
+
+## PageSpeed
+
+**Handler:** `quality`
+
+Runs a Google PageSpeed Insights (Lighthouse) analysis, scoring the site across four categories on a 0-100 scale:
+
+| Category | What it measures |
+|---|---|
+| **Performance** | Largest Contentful Paint (LCP), Cumulative Layout Shift (CLS), Total Blocking Time (TBT), First Contentful Paint (FCP), Speed Index |
+| **Accessibility** | Alt text, ARIA labels, color contrast, keyboard navigation, semantic HTML |
+| **Best Practices** | HTTPS usage, deprecated APIs, console errors, image aspect ratios, mixed content |
+| **SEO** | Crawlability, mobile-friendliness, meta tags, structured data, status codes |
+
+**Why it matters:** Google uses Core Web Vitals (LCP, CLS, and Interaction to Next Paint) as ranking signals. Performance below 50 directly impacts search rankings. Accessibility issues exclude users with disabilities and create legal risk (ADA, EAA). Best Practices failures indicate technical debt.
+
+**Good result:** All four scores at 90 or above (green). This indicates a fast, accessible, well-built site that follows current web standards.
+
+**Bad result:** Any score below 50 (red). Common issues include:
+
+- **Performance:** Unoptimized images, render-blocking JavaScript, excessive third-party scripts
+- **Accessibility:** Missing alt text, insufficient color contrast, no ARIA labels on interactive elements
+- **Best Practices:** Mixed HTTP/HTTPS content, use of deprecated browser APIs, missing doctype
+- **SEO:** Missing meta description, no viewport meta tag, blocked by robots.txt
+
+<Aside type="caution">
+  Requires the `GOOGLE_CLOUD_API_KEY` environment variable. Without the key, this check is skipped. The API has a generous free tier, but rate limits apply.
+</Aside>
+
+<Aside type="note">
+  PageSpeed results can vary between runs due to network conditions and server load. For reliable benchmarks, run the check multiple times and look at the trend rather than a single score.
+</Aside>

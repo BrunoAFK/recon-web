@@ -1,0 +1,168 @@
+---
+title: Kubernetes (Helm)
+description: Deploy recon-web on Kubernetes with the included Helm chart
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+recon-web ships with a Helm chart at `helm/recon-web/` that deploys the API server, web frontend, and optional scheduled scanner as Kubernetes workloads.
+
+## Prerequisites
+
+- Kubernetes 1.25+
+- Helm 3.10+
+- `kubectl` configured to talk to your cluster
+
+## Quick install
+
+<Steps>
+1. Clone the repository (or add the chart from a Helm registry if published):
+   ```bash
+   git clone https://github.com/brunoafk/recon-web.git
+   cd recon-web
+   ```
+
+2. Install with default values:
+   ```bash
+   helm install recon-web ./helm/recon-web
+   ```
+
+3. Port-forward to access the UI locally:
+   ```bash
+   kubectl port-forward svc/recon-web-web 8080:80
+   ```
+
+4. Open [http://localhost:8080](http://localhost:8080).
+</Steps>
+
+## Custom values
+
+Create a `values-override.yaml` to configure the deployment for your environment:
+
+```yaml
+# values-override.yaml
+
+ingress:
+  enabled: true
+  className: nginx
+  host: recon.example.com
+  tls: true
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+
+auth:
+  enabled: true
+  token: "your-secret-token-at-least-32-chars-long"
+
+api:
+  env:
+    GOOGLE_CLOUD_API_KEY: "AIza..."
+    VIRUSTOTAL_API_KEY: "abcdef..."
+    MAX_CONCURRENCY: "4"
+
+scanner:
+  enabled: true
+  schedule: "0 */6 * * *"
+  urls:
+    - https://example.com
+    - https://another-site.com
+
+notifications:
+  telegram:
+    enabled: true
+    botToken: "123456789:ABCdefGHI..."
+    chatId: "123456789"
+  email:
+    enabled: true
+    smtpHost: smtp.gmail.com
+    smtpPort: "587"
+    smtpUser: alerts@example.com
+    smtpPass: "abcd efgh ijkl mnop"
+    notifyEmail: team@example.com
+
+persistence:
+  enabled: true
+  size: 5Gi
+  storageClass: gp3
+```
+
+Install with the override file:
+
+```bash
+helm install recon-web ./helm/recon-web -f values-override.yaml
+```
+
+## Resource defaults
+
+| Component | CPU request | CPU limit | Memory request | Memory limit |
+|---|---|---|---|---|
+| API | 100m | 1000m | 256Mi | 1Gi |
+| Web | 50m | 200m | 64Mi | 128Mi |
+
+Override these under `api.resources` and `web.resources` in your values file.
+
+## Custom images
+
+To use images from a private registry:
+
+```yaml
+api:
+  image:
+    repository: registry.example.com/recon-web/api
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+
+web:
+  image:
+    repository: registry.example.com/recon-web/web
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+```
+
+## Persistence
+
+The API server stores scan history in a SQLite database backed by a PersistentVolumeClaim.
+
+| Setting | Default | Description |
+|---|---|---|
+| `persistence.enabled` | `true` | Create a PVC for scan data |
+| `persistence.size` | `1Gi` | Volume size |
+| `persistence.storageClass` | _(cluster default)_ | Storage class to use |
+| `persistence.accessMode` | `ReadWriteOnce` | PVC access mode |
+
+<Aside type="caution">
+  With `ReadWriteOnce`, only one API pod can write to the volume at a time. Do not scale `api.replicas` above 1 unless you switch to a `ReadWriteMany` storage class or an external database.
+</Aside>
+
+## Scheduled scanner
+
+The Helm chart can deploy a Kubernetes CronJob that runs the CLI image on a schedule:
+
+```yaml
+scanner:
+  enabled: true
+  schedule: "0 0 * * *"
+  urls:
+    - https://example.com
+  image:
+    repository: ghcr.io/brunoafk/recon-web/cli
+    tag: latest
+```
+
+This is an alternative to the built-in scheduler (`SCHEDULE_ENABLED`). The Kubernetes CronJob approach gives you native retry policies, resource limits, and pod-level observability.
+
+## Upgrading
+
+```bash
+helm upgrade recon-web ./helm/recon-web -f values-override.yaml
+```
+
+## Uninstalling
+
+```bash
+helm uninstall recon-web
+```
+
+<Aside type="note">
+  Uninstalling the Helm release does not delete PersistentVolumeClaims by default. To remove scan data, delete the PVC manually: `kubectl delete pvc -l app.kubernetes.io/name=recon-web`.
+</Aside>

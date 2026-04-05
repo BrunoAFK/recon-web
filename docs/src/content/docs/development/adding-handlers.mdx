@@ -1,0 +1,311 @@
+---
+title: Adding a Check
+description: How to create a new analysis handler for recon-web
+---
+
+import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Adding a new check to recon-web involves creating a handler in **core**, registering it, building a renderer in **web**, and writing tests. Follow the steps below.
+
+<Steps>
+
+1. ## Create the handler
+
+   Create a new file at `packages/core/src/handlers/my-check.ts`.
+
+   Every handler must satisfy the `AnalysisHandler<T>` signature and return a `HandlerResult<T>`. Import helpers from the shared utilities.
+
+   ```ts title="packages/core/src/handlers/my-check.ts"
+   import type { AnalysisHandler, HandlerResult } from '../types.js';
+   import { extractHostname } from '../utils.js';
+
+   export interface MyCheckResult {
+     headerPresent: boolean;
+     headerValue: string | null;
+   }
+
+   export const myCheckHandler: AnalysisHandler<MyCheckResult> = async (url, options) => {
+     const hostname = extractHostname(url);
+
+     try {
+       const response = await fetch(url, {
+         signal: options?.signal,
+       });
+
+       const value = response.headers.get('x-custom-header');
+
+       return {
+         data: {
+           headerPresent: value !== null,
+           headerValue: value,
+         },
+       };
+     } catch (error) {
+       return {
+         error: error instanceof Error ? error.message : String(error),
+         errorCode: 'TIMEOUT',
+         errorCategory: 'site',
+       };
+     }
+   };
+   ```
+
+   <Aside type="caution">
+   Never throw from a handler. Always return an error result so the runner can classify and report the failure cleanly.
+   </Aside>
+
+   ### Error codes reference
+
+   Use the appropriate `ErrorCode` when returning an error:
+
+   | ErrorCode | When to use |
+   |---|---|
+   | `TIMEOUT` | The request exceeded the allowed time |
+   | `DNS_FAILURE` | The hostname could not be resolved |
+   | `CONNECTION_REFUSED` | TCP connection was rejected |
+   | `MISSING_API_KEY` | A required third-party API key is not configured |
+   | `NO_DATA` | The check ran successfully but produced no meaningful result |
+   | `INVALID_URL` | The input URL is malformed |
+   | `SSRF_BLOCKED` | The URL resolved to a private/internal IP |
+   | `REQUIRES_CHROMIUM` | The check needs a headless browser that is not available |
+   | `NOT_FOUND` | The target resource was not found (404) |
+
+   ### Error categories
+
+   | ErrorCategory | Meaning |
+   |---|---|
+   | `tool` | A problem with the recon-web framework or infrastructure |
+   | `site` | A problem with the target website |
+   | `info` | The check was intentionally skipped (e.g., not applicable) |
+
+2. ## Export from the handlers barrel
+
+   Add the export to `packages/core/src/handlers/index.ts`:
+
+   ```ts title="packages/core/src/handlers/index.ts"
+   // ... existing exports
+   export { myCheckHandler } from './my-check.js';
+   export type { MyCheckResult } from './my-check.js';
+   ```
+
+3. ## Register in the registry
+
+   Open `packages/core/src/registry.ts` and add an entry:
+
+   ```ts title="packages/core/src/registry.ts"
+   import { myCheckHandler } from './handlers/my-check.js';
+
+   registry.register({
+     name: 'my-check',
+     description: 'Check for the presence of X-Custom-Header',
+     category: 'http',
+     requires: [],
+     handler: myCheckHandler,
+   });
+   ```
+
+   The `requires` array declares runtime dependencies. Common values:
+
+   - `'chromium'` — needs a headless browser
+   - `'apiKey:shodan'` — needs a third-party API key
+
+   Leave the array empty if the handler only needs outbound HTTP.
+
+4. ## Add presentation metadata
+
+   Open `packages/core/src/presentation.ts` and add a display name and short description:
+
+   ```ts title="packages/core/src/presentation.ts"
+   // ... existing entries
+   'my-check': {
+     displayName: 'Custom Header Check',
+     shortDescription: 'Looks for X-Custom-Header in the HTTP response',
+   },
+   ```
+
+5. ## Create a web renderer
+
+   Create `packages/web/src/components/results/renderers/MyCheckRenderer.tsx`:
+
+   ```tsx title="packages/web/src/components/results/renderers/MyCheckRenderer.tsx"
+   import type { MyCheckResult } from '@recon-web/core';
+   import { ChecklistItem } from '../primitives/ChecklistItem';
+   import { KeyValueTable } from '../primitives/KeyValueTable';
+   import { SectionLabel } from '../primitives/SectionLabel';
+
+   interface Props {
+     data: MyCheckResult;
+   }
+
+   export function MyCheckRenderer({ data }: Props) {
+     return (
+       <div>
+         <SectionLabel>Custom Header</SectionLabel>
+         <ChecklistItem
+           label="X-Custom-Header present"
+           passed={data.headerPresent}
+         />
+         {data.headerValue && (
+           <KeyValueTable
+             rows={[{ key: 'Value', value: data.headerValue }]}
+           />
+         )}
+       </div>
+     );
+   }
+   ```
+
+   Then register it in `packages/web/src/components/results/renderers/index.ts`:
+
+   ```ts title="packages/web/src/components/results/renderers/index.ts"
+   import { MyCheckRenderer } from './MyCheckRenderer';
+
+   // ... inside the renderers map
+   'my-check': MyCheckRenderer,
+   ```
+
+   ### Available renderer primitives
+
+   | Component | Purpose |
+   |---|---|
+   | `ChecklistItem` | A pass/fail item with a label and boolean status |
+   | `KeyValueTable` | A two-column table of key-value pairs |
+   | `SectionLabel` | A heading for grouping related results |
+   | `Chip` | A small label/badge (e.g., severity, status) |
+   | `CodeBlock` | A syntax-highlighted block for raw output |
+
+6. ## Write tests
+
+   Create `packages/core/src/handlers/my-check.test.ts`. Use **Vitest** and **MSW** to mock HTTP responses:
+
+   ```ts title="packages/core/src/handlers/my-check.test.ts"
+   import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+   import { setupServer } from 'msw/node';
+   import { http, HttpResponse } from 'msw';
+   import { myCheckHandler } from './my-check.js';
+
+   const server = setupServer();
+
+   beforeAll(() => server.listen());
+   afterEach(() => server.resetHandlers());
+   afterAll(() => server.close());
+
+   describe('myCheckHandler', () => {
+     it('detects the header when present', async () => {
+       server.use(
+         http.get('https://example.com/', () =>
+           HttpResponse.text('OK', {
+             headers: { 'x-custom-header': 'some-value' },
+           }),
+         ),
+       );
+
+       const result = await myCheckHandler('https://example.com/');
+
+       expect(result.data?.headerPresent).toBe(true);
+       expect(result.data?.headerValue).toBe('some-value');
+     });
+
+     it('reports absence when the header is missing', async () => {
+       server.use(
+         http.get('https://example.com/', () => HttpResponse.text('OK')),
+       );
+
+       const result = await myCheckHandler('https://example.com/');
+
+       expect(result.data?.headerPresent).toBe(false);
+       expect(result.data?.headerValue).toBeNull();
+     });
+
+     it('returns an error result on network failure', async () => {
+       server.use(
+         http.get('https://example.com/', () => HttpResponse.error()),
+       );
+
+       const result = await myCheckHandler('https://example.com/');
+
+       expect(result.error).toBeDefined();
+       expect(result.errorCategory).toBe('site');
+     });
+   });
+   ```
+
+7. ## Build and verify
+
+   ```bash
+   # Rebuild core with the new handler
+   npx tsc -b packages/core
+
+   # Run core tests
+   npm test -w @recon-web/core
+
+   # Confirm the full build still works
+   npx tsc --build
+   ```
+
+</Steps>
+
+## Complete example: HTTP header checker
+
+Below is a self-contained handler that checks whether a site sends common security headers. This is a realistic example you can use as a starting template.
+
+```ts title="packages/core/src/handlers/security-headers.ts"
+import type { AnalysisHandler, HandlerResult } from '../types.js';
+import { normalizeUrl } from '../utils.js';
+
+const SECURITY_HEADERS = [
+  'strict-transport-security',
+  'content-security-policy',
+  'x-content-type-options',
+  'x-frame-options',
+  'referrer-policy',
+  'permissions-policy',
+] as const;
+
+export interface SecurityHeadersResult {
+  headers: Array<{
+    name: string;
+    present: boolean;
+    value: string | null;
+  }>;
+  score: number; // 0-100
+}
+
+export const securityHeadersHandler: AnalysisHandler<SecurityHeadersResult> = async (
+  url,
+  options,
+) => {
+  const normalized = normalizeUrl(url);
+
+  try {
+    const response = await fetch(normalized, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: options?.signal,
+    });
+
+    const headers = SECURITY_HEADERS.map((name) => {
+      const value = response.headers.get(name);
+      return { name, present: value !== null, value };
+    });
+
+    const presentCount = headers.filter((h) => h.present).length;
+    const score = Math.round((presentCount / SECURITY_HEADERS.length) * 100);
+
+    return { data: { headers, score } };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return { error: 'Request timed out', errorCode: 'TIMEOUT', errorCategory: 'site' };
+    }
+    return {
+      error: error instanceof Error ? error.message : String(error),
+      errorCode: 'CONNECTION_REFUSED',
+      errorCategory: 'site',
+    };
+  }
+};
+```
+
+<Aside type="tip">
+After registering this handler, both the CLI (`recon-web security-headers https://example.com`) and the API (`POST /api/scan` with the handler selected) will pick it up automatically thanks to the registry pattern.
+</Aside>

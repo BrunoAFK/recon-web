@@ -356,9 +356,9 @@ export const registry: Record<string, HandlerRegistryEntry> = {
     handler: sslLabsHandler,
     metadata: {
       name: 'ssl-labs',
-      description: 'Run a Qualys SSL Labs assessment to get an overall SSL/TLS grade (A+, A, B, C, F) and detailed endpoint analysis.',
+      description: 'Grade the server\'s SSL/TLS configuration (A+ to F) by checking protocol version, cipher strength, certificate validity, and HSTS.',
       category: 'security',
-      requires: ['http'],
+      requires: ['tls'],
     },
   },
   virustotal: {

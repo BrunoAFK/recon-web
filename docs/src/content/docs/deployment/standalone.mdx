@@ -1,0 +1,192 @@
+---
+title: Standalone (Node.js)
+description: Run recon-web directly with Node.js without Docker
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+This guide covers running recon-web directly on a machine with Node.js, without Docker. This is useful for development, for environments where Docker is not available, or when you want full control over the runtime.
+
+## Prerequisites
+
+- **Node.js 24+** (LTS recommended)
+- **npm** (included with Node.js)
+- **Chromium or Google Chrome** (optional, required for screenshots and Lighthouse checks)
+
+## Install and build
+
+<Steps>
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/brunoafk/recon-web.git
+   cd recon-web
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Create your environment file:
+   ```bash
+   cp .env.example .env
+   ```
+
+4. Build all packages:
+   ```bash
+   npm run build
+   ```
+
+5. Start the server:
+   ```bash
+   npm start
+   ```
+
+   The API server starts on port 3000 and serves the web UI from the built frontend assets.
+</Steps>
+
+## Chromium setup
+
+Several handlers (screenshots, Lighthouse performance audits) need a Chromium binary. The server auto-detects common installation paths, but you can set it explicitly if needed.
+
+<Tabs>
+  <TabItem label="macOS">
+    If you have Google Chrome installed, it is auto-detected at:
+    ```
+    /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
+    ```
+
+    Alternatively, install Chromium via Homebrew:
+    ```bash
+    brew install --cask chromium
+    ```
+
+    Then set the path in `.env`:
+    ```bash
+    CHROME_PATH=/Applications/Chromium.app/Contents/MacOS/Chromium
+    ```
+  </TabItem>
+
+  <TabItem label="Linux (Debian/Ubuntu)">
+    Install Chromium from the system package manager:
+    ```bash
+    sudo apt-get update
+    sudo apt-get install -y chromium
+    ```
+
+    The server auto-detects `/usr/bin/chromium`. If your distribution installs it elsewhere:
+    ```bash
+    CHROME_PATH=/usr/bin/chromium-browser
+    ```
+  </TabItem>
+
+  <TabItem label="Linux (RHEL/Fedora)">
+    ```bash
+    sudo dnf install chromium
+    ```
+
+    Set the path if needed:
+    ```bash
+    CHROME_PATH=/usr/bin/chromium-browser
+    ```
+  </TabItem>
+</Tabs>
+
+<Aside type="tip">
+  If you do not need screenshot or Lighthouse checks, you can skip Chromium entirely. Handlers that require it will report as "skipped" and all other checks will run normally.
+</Aside>
+
+## API-only mode
+
+By default the server serves the built frontend. To run in API-only mode (e.g. behind a separate frontend or for headless use), set:
+
+```bash
+STATIC_DIR=none
+```
+
+In this mode the server only exposes the REST API and Swagger docs. No static files are served.
+
+## Running with PM2
+
+For production use without Docker, [PM2](https://pm2.keymetrics.io/) provides process management, automatic restarts, log rotation, and cluster mode.
+
+<Steps>
+1. Install PM2 globally:
+   ```bash
+   npm install -g pm2
+   ```
+
+2. Start recon-web:
+   ```bash
+   pm2 start npm --name recon-web -- start
+   ```
+
+3. Save the process list so it survives reboots:
+   ```bash
+   pm2 save
+   pm2 startup
+   ```
+
+4. Monitor:
+   ```bash
+   pm2 logs recon-web
+   pm2 monit
+   ```
+</Steps>
+
+## Nginx reverse proxy
+
+In production you will typically place recon-web behind a reverse proxy for TLS termination, custom domain, and caching. Here is a minimal Nginx configuration:
+
+```nginx
+server {
+    listen 80;
+    server_name recon.example.com;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name recon.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/recon.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/recon.example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # SSE streaming support
+    location /api/stream {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 300s;
+    }
+}
+```
+
+<Aside type="caution">
+  The `/api/stream` location block disables proxy buffering so that SSE events are forwarded to the client immediately. Without this, results will not stream in real time.
+</Aside>
+
+## Development mode
+
+For development with hot reloading, use the dev scripts instead of building first:
+
+```bash
+# Terminal 1 — API server with watch mode
+npm run dev
+
+# Terminal 2 — Web UI dev server
+npm run dev:web
+```
+
+The web UI dev server typically runs on port 8080 and proxies API requests to port 3000.

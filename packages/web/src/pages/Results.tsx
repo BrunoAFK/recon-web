@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, AlertTriangle, ExternalLink, Loader2, Globe, Eye } from "lucide-react";
 import { useHandlers, useLiveScan } from "@/hooks/use-scan";
 import ResultGrid from "@/components/results/ResultGrid";
@@ -13,7 +13,6 @@ export default function Results() {
   const decodedUrl = url ? decodeURIComponent(url) : "";
   const scan = useLiveScan(decodedUrl);
   const handlers = useHandlers();
-  const navigate = useNavigate();
 
   // Whether the user dismissed the loading screen to see partial results
   const [showPartial, setShowPartial] = useState(false);
@@ -36,13 +35,6 @@ export default function Results() {
       window.history.replaceState(null, "", `/history/${scan.scanId}`);
     }
   }, [scan.scanId]);
-
-  // Navigate to history page once scan completes to show final results
-  useEffect(() => {
-    if (scan.status === "completed" && scan.scanId) {
-      navigate(`/history/${scan.scanId}`, { replace: true });
-    }
-  }, [scan.status, scan.scanId, navigate]);
 
   // Stale scan timeout — if no scanId arrives within 15s, something is wrong
   const [staleTimeout, setStaleTimeout] = useState(false);

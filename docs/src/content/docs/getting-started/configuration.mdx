@@ -1,0 +1,68 @@
+---
+title: Configuration
+description: Environment variables, API keys, and authentication
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+All configuration in recon-web is managed through environment variables. The easiest way to set them is with a `.env` file in the project root.
+
+```bash
+cp .env.example .env
+```
+
+## Core settings
+
+These control general server behavior and resource limits.
+
+| Variable | Default | Description |
+|---|---|---|
+| `PORT` | `3000` | Port the API server listens on. |
+| `HOST` | `0.0.0.0` | Bind address for the API server. |
+| `API_TIMEOUT_LIMIT` | `30000` | Maximum time in milliseconds for a single check to complete before it is aborted. |
+| `API_CORS_ORIGIN` | `*` | Allowed CORS origins. Set to your domain in production. |
+| `MAX_CONCURRENCY` | `8` | Number of checks that run in parallel during a scan. Lower this on resource-constrained machines. |
+| `DB_PATH` | _(built-in default)_ | Path to the SQLite database file used for scan history. |
+| `CHROME_PATH` | _(auto-detected)_ | Path to a Chromium or Chrome binary. Required for screenshot and some rendering-based checks. |
+
+<Aside type="tip">
+  If you are running inside Docker, `CHROME_PATH` is already set in the image. You only need to configure it when running from source on a machine where Chromium is installed in a non-standard location.
+</Aside>
+
+## API keys
+
+API keys are **optional**. Every built-in check works without any keys configured. Adding keys enables extra checks or removes rate limits imposed by third-party services.
+
+| Variable | Service | Notes |
+|---|---|---|
+| `GOOGLE_CLOUD_API_KEY` | Google PageSpeed Insights and Safe Browsing | Enables Lighthouse performance audits and malware/phishing reputation checks. |
+| `VIRUSTOTAL_API_KEY` | VirusTotal | Free tier allows 500 requests per day. Used for domain and URL reputation scanning. |
+| `ABUSEIPDB_API_KEY` | AbuseIPDB | Free tier allows 1,000 checks per day. Used for IP abuse confidence scoring. |
+| `CLOUDMERSIVE_API_KEY` | Cloudmersive | Provides additional threat intelligence and URL safety checks. |
+| `BUILT_WITH_API_KEY` | BuiltWith | Reveals the full technology stack behind a target site. |
+| `TRANCO_API_KEY` | Tranco List | Checks the target's ranking in the Tranco top-sites list. |
+
+<Aside type="note">
+  You do not need all keys to get useful results. Start with no keys, review your scan output, and add keys for the services whose extra data you find valuable.
+</Aside>
+
+## Authentication
+
+By default, recon-web is open — anyone who can reach the server can run scans. To restrict access, enable bearer-token authentication.
+
+| Variable | Default | Description |
+|---|---|---|
+| `AUTH_ENABLED` | `false` | Set to `true` to require a bearer token on every API request. |
+| `AUTH_TOKEN` | _(none)_ | The secret token clients must send in the `Authorization` header. |
+
+When authentication is enabled, all requests to the API must include the header:
+
+```
+Authorization: Bearer <your-token>
+```
+
+The web UI will prompt for the token on first load and store it in the browser's local storage. CLI users can pass it via the `--token` flag or the `RECON_WEB_TOKEN` environment variable.
+
+<Aside type="caution">
+  Always enable authentication if your instance is exposed to the internet. Without it, anyone can trigger scans from your server.
+</Aside>

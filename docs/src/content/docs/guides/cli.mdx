@@ -1,0 +1,224 @@
+---
+title: CLI
+description: Using the recon-web command-line interface
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+The recon-web CLI lets you run scans, inspect individual handlers, and integrate results into CI/CD pipelines -- all from the terminal.
+
+## Installation
+
+<Tabs>
+  <TabItem label="From source">
+    Clone the monorepo and install dependencies:
+
+    ```bash
+    git clone https://github.com/brunoafk/recon-web.git
+    cd recon-web
+    npm install
+    ```
+
+    The CLI entry point is in `packages/cli`. You can run it directly with:
+
+    ```bash
+    node packages/cli/dist/index.js scan example.com
+    ```
+
+    Or link it globally during development:
+
+    ```bash
+    npm run build
+    npm link --workspace=packages/cli
+    recon-web scan example.com
+    ```
+  </TabItem>
+
+  <TabItem label="Docker">
+    No installation needed. Pull and run the pre-built image:
+
+    ```bash
+    docker run --rm ghcr.io/brunoafk/recon-web/cli scan example.com
+    ```
+  </TabItem>
+</Tabs>
+
+## Commands
+
+### `scan` -- full scan (default)
+
+Run all analysis handlers against a URL:
+
+```bash
+recon-web scan https://example.com
+```
+
+The `scan` command is the default, so you can also write:
+
+```bash
+recon-web https://example.com
+```
+
+### Individual handler commands
+
+Every registered handler is available as a sub-command. These are auto-generated from the handler registry, so the list grows as new handlers are added. Examples:
+
+```bash
+recon-web ssl https://example.com
+recon-web dns https://example.com
+recon-web headers https://example.com
+recon-web ports https://example.com
+recon-web whois https://example.com
+recon-web tech-stack https://example.com
+```
+
+Run `recon-web --help` to see the full list of available handlers.
+
+## Output formats
+
+### Colored text (default)
+
+The default output uses coloured text with category badges, status indicators, and compact summaries:
+
+```bash
+recon-web scan https://example.com
+```
+
+Add `--verbose` (`-v`) for expanded output showing all fields:
+
+```bash
+recon-web scan -v https://example.com
+```
+
+### JSON
+
+Use `--json` or `--format json` to get machine-readable output:
+
+```bash
+recon-web scan --json https://example.com > results.json
+```
+
+The JSON output contains `{ url, results }` where `results` is a map of handler names to their result objects.
+
+### JUnit XML
+
+Use `--format junit` to produce JUnit XML, suitable for CI test reporters:
+
+```bash
+recon-web scan --format junit https://example.com > results.xml
+```
+
+Each handler becomes a `<testcase>`. Handlers that errored become `<failure>` elements and skipped handlers become `<skipped>` elements.
+
+## CI/CD integration
+
+### Fail-on rules
+
+The `--fail-on` flag causes the CLI to exit with code 1 if specified conditions are met. This lets you gate deployments on security criteria.
+
+```bash
+recon-web scan --fail-on ssl:expired https://example.com
+```
+
+Rules follow the format `handler:condition[:value]`. Supported conditions:
+
+| Rule | Meaning |
+|---|---|
+| `ssl:expired` | Fail if the SSL certificate is expired |
+| `security-score:below:80` | Fail if the handler's `score` field is below the threshold |
+| `headers:missing:content-security-policy` | Fail if a specific field is missing from the result |
+
+Multiple rules can be passed:
+
+```bash
+recon-web scan \
+  --fail-on ssl:expired \
+  --fail-on security-score:below:80 \
+  https://example.com
+```
+
+### JUnit for test reporters
+
+Most CI systems (GitHub Actions, GitLab CI, Jenkins) can ingest JUnit XML to display test results in the UI:
+
+```yaml
+# GitHub Actions example
+- name: Security scan
+  run: recon-web scan --format junit https://staging.example.com > scan-results.xml
+
+- name: Publish results
+  uses: mikepenz/action-junit-report@v4
+  with:
+    report_paths: scan-results.xml
+```
+
+## Diff comparison
+
+Compare the current scan against a saved baseline to detect changes:
+
+```bash
+# Save a baseline
+recon-web scan --json https://example.com > baseline.json
+
+# Later, compare against it
+recon-web scan --diff baseline.json https://example.com
+```
+
+The diff output highlights handlers that were added, removed, or changed between the two scans.
+
+## The `--only` flag
+
+Run a subset of handlers by passing a comma-separated list:
+
+```bash
+recon-web scan --only ssl,dns,headers https://example.com
+```
+
+This is useful for faster, focused scans when you only care about specific checks.
+
+## Docker usage
+
+The CLI Docker image works exactly like the local CLI. Pass arguments after the image name:
+
+```bash
+# Full scan
+docker run --rm ghcr.io/brunoafk/recon-web/cli scan https://example.com
+
+# JSON output
+docker run --rm ghcr.io/brunoafk/recon-web/cli scan --json https://example.com
+
+# Single handler
+docker run --rm ghcr.io/brunoafk/recon-web/cli ssl https://example.com
+
+# With API keys
+docker run --rm \
+  -e GOOGLE_CLOUD_API_KEY=your-key \
+  ghcr.io/brunoafk/recon-web/cli scan https://example.com
+
+# Fail-on in CI
+docker run --rm ghcr.io/brunoafk/recon-web/cli \
+  scan --fail-on ssl:expired --format junit https://example.com
+```
+
+<Aside type="tip">
+  The Docker image includes Chromium, so handlers that require a browser (screenshots, Lighthouse) work out of the box. When running from source you may need to set `CHROME_PATH`.
+</Aside>
+
+## Configuration
+
+The CLI reads configuration from two sources:
+
+1. **`.recon-web.json`** -- looked up first in the current directory, then in your home directory. Supports `apiKeys` and `chromePath`.
+2. **Environment variables** -- override the config file. The same `GOOGLE_CLOUD_API_KEY`, `VIRUSTOTAL_API_KEY`, etc. variables used by the API server work with the CLI.
+
+Example `.recon-web.json`:
+
+```json
+{
+  "apiKeys": {
+    "GOOGLE_CLOUD_API_KEY": "AIza...",
+    "VIRUSTOTAL_API_KEY": "abcdef..."
+  },
+  "chromePath": "/usr/bin/chromium"
+}
+```

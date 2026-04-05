@@ -1,0 +1,120 @@
+---
+title: Docker (Local Build)
+description: Build and run recon-web from source with Docker Compose
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+This guide walks you through building and running recon-web from source using Docker Compose. This approach gives you the full stack -- API server, web UI, and CLI -- built from the code on your machine.
+
+## Prerequisites
+
+- Docker Engine 20+
+- Docker Compose v2+ (the `docker compose` plugin, not the legacy `docker-compose` binary)
+
+## Getting started
+
+<Steps>
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/brunoafk/recon-web.git
+   cd recon-web
+   ```
+
+2. Create your environment file:
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `.env` to add API keys or enable authentication. See [Configuration](/recon-web/getting-started/configuration/) for all options.
+
+3. Start all services:
+   ```bash
+   docker compose up -d
+   ```
+   Docker builds the images from source on first run. Subsequent starts reuse the cached images unless the source changes.
+
+4. Open the web UI at [http://localhost:8080](http://localhost:8080) and run your first scan.
+</Steps>
+
+## Services
+
+| Service | Port | Description |
+|---|---|---|
+| `api` | `3000` | Fastify API server -- runs all handlers, stores scan history |
+| `web` | `8080` | Nginx-served frontend -- proxies API requests to the `api` service |
+| `cli` | _(none)_ | CLI container (on-demand, activated via Docker Compose profiles) |
+
+## Custom ports
+
+Override the default ports with environment variables:
+
+```bash
+API_PORT=4000 WEB_PORT=9090 docker compose up -d
+```
+
+Or set them in your `.env` file:
+
+```bash
+API_PORT=4000
+WEB_PORT=9090
+```
+
+## Running CLI scans
+
+The CLI service uses a Docker Compose profile and only runs when explicitly invoked:
+
+```bash
+docker compose run --rm cli scan https://example.com
+```
+
+```bash
+docker compose run --rm cli ssl https://example.com
+```
+
+```bash
+docker compose run --rm cli scan --json https://example.com > results.json
+```
+
+## Data persistence
+
+Scan history is stored in a SQLite database inside a Docker volume called `scan-data`. This volume persists across container restarts and rebuilds.
+
+### Backup
+
+```bash
+docker compose cp api:/app/data/recon-web.db ./backup-recon-web.db
+```
+
+### Restore
+
+```bash
+docker compose cp ./backup-recon-web.db api:/app/data/recon-web.db
+docker compose restart api
+```
+
+## Rebuilding images
+
+If you pull new source code or make changes, rebuild the images:
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+## Stopping
+
+Stop all services but keep volumes (scan history preserved):
+
+```bash
+docker compose down
+```
+
+Stop all services and delete volumes (scan history deleted):
+
+```bash
+docker compose down -v
+```
+
+<Aside type="caution">
+  `docker compose down -v` permanently deletes the scan history database. Back it up first if you need the data.
+</Aside>

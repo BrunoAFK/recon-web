@@ -1,12 +1,24 @@
-import { KeyValueTable, SectionLabel, Chip } from "./primitives";
+import { ChecklistItem, KeyValueTable, SectionLabel, Chip } from "./primitives";
 import type { RendererProps } from "./types";
 
-interface SslLabsEndpoint {
-  ipAddress: string;
-  grade: string;
-  gradeTrustIgnored: string;
-  hasWarnings: boolean;
-  isExceptional: boolean;
+interface GradeCheck {
+  id: string;
+  label: string;
+  passed: boolean;
+  severity: "critical" | "warning" | "info";
+  detail?: string;
+}
+
+interface SslLabsDetails {
+  protocolVersion?: string | null;
+  cipherSuite?: string | null;
+  certValid?: boolean;
+  certExpiresDays?: number | null;
+  certIssuer?: string | null;
+  certSubject?: string | null;
+  hasHsts?: boolean;
+  hstsMaxAge?: number | null;
+  checks?: GradeCheck[];
 }
 
 interface SslLabsData {
@@ -14,8 +26,13 @@ interface SslLabsData {
   grade?: string | null;
   gradeTrustIgnored?: string | null;
   hasWarnings?: boolean;
-  endpoints?: SslLabsEndpoint[];
+  endpoints?: Array<{
+    ipAddress: string;
+    grade: string;
+    hasWarnings: boolean;
+  }>;
   testTime?: string | null;
+  details?: SslLabsDetails;
 }
 
 function gradeColor(grade: string): "success" | "warning" | "danger" | "default" {
@@ -28,7 +45,7 @@ function gradeColor(grade: string): "success" | "warning" | "danger" | "default"
 
 export function SslLabsRenderer({ data }: RendererProps) {
   const d = data as SslLabsData | undefined;
-  if (!d) return <span className="text-sm text-muted">No SSL Labs data</span>;
+  if (!d) return <span className="text-sm text-muted">No SSL grade data</span>;
 
   const grade = d.grade;
 
@@ -52,7 +69,7 @@ export function SslLabsRenderer({ data }: RendererProps) {
             {grade}
           </span>
           <div>
-            <p className="text-sm font-medium text-foreground">SSL Labs Grade</p>
+            <p className="text-sm font-medium text-foreground">SSL Grade</p>
             {d.hasWarnings && (
               <p className="text-xs text-warning">Has warnings</p>
             )}
@@ -60,21 +77,32 @@ export function SslLabsRenderer({ data }: RendererProps) {
         </div>
       )}
 
-      {/* Endpoint details */}
-      {d.endpoints && d.endpoints.length > 0 && (
+      {/* Detailed checks */}
+      {d.details?.checks && d.details.checks.length > 0 && (
+        <div className="space-y-1.5">
+          {d.details.checks.map((check) => (
+            <div key={check.id}>
+              <ChecklistItem label={check.label} passed={check.passed} />
+              {check.detail && !check.passed && (
+                <p className="text-xs text-muted ml-6">{check.detail}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Connection info */}
+      {d.details && (
         <div>
-          <SectionLabel>Endpoints</SectionLabel>
-          <div className="space-y-2 mt-1">
-            {d.endpoints.map((ep) => (
-              <div
-                key={ep.ipAddress}
-                className="flex items-center justify-between gap-3 py-1.5 border-b border-border/15 last:border-0"
-              >
-                <span className="text-sm text-foreground font-mono break-all">{ep.ipAddress}</span>
-                <Chip label={ep.grade} variant={gradeColor(ep.grade)} />
-              </div>
-            ))}
-          </div>
+          <SectionLabel>Connection</SectionLabel>
+          <KeyValueTable
+            items={[
+              ...(d.details.protocolVersion ? [{ label: "Protocol", value: d.details.protocolVersion }] : []),
+              ...(d.details.cipherSuite ? [{ label: "Cipher", value: d.details.cipherSuite }] : []),
+              ...(d.details.certIssuer ? [{ label: "Issuer", value: d.details.certIssuer }] : []),
+              ...(d.details.certExpiresDays != null ? [{ label: "Cert expires", value: `${d.details.certExpiresDays} days` }] : []),
+            ]}
+          />
         </div>
       )}
 

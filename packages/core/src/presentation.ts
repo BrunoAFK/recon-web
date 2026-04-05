@@ -152,8 +152,8 @@ export const handlerPresentation: Record<string, HandlerPresentation> = {
     shortDescription: 'Scan the URL against 70+ antivirus and security engines.',
   },
   'ssl-labs': {
-    displayName: 'SSL Labs Grade',
-    shortDescription: 'Get a Qualys SSL Labs grade for the server\'s TLS configuration.',
+    displayName: 'SSL Grade',
+    shortDescription: 'Grade the server\'s TLS setup: protocol, cipher, certificate, and HSTS.',
   },
   'server-location': {
     displayName: 'Server Location',

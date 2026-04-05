@@ -1,0 +1,230 @@
+---
+title: Security Checks
+description: "12 security checks: SSL, TLS, HSTS, headers, firewall, threats, and more"
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+recon-web runs 12 security-focused checks that cover certificate validation, protocol configuration, header hardening, threat intelligence, and CMS-specific vulnerabilities.
+
+---
+
+## SSL Certificate
+
+**Handler:** `ssl`
+
+Fetches and analyzes the SSL/TLS certificate presented by the server. Extracts the issuer (who signed it), validity dates, subject alternative names (SANs), key algorithm, and the full chain of trust.
+
+**Why it matters:** An expired or misconfigured certificate triggers browser security warnings that immediately drive users away. Missing SANs mean HTTPS breaks on uncovered subdomains.
+
+**Good result:** A trusted certificate issued by a recognized CA, more than 30 days until expiry, and SANs covering all expected subdomains.
+
+**Bad result:** Expired certificate, self-signed certificate (browsers will warn), hostname mismatch, or expiry within the next 30 days.
+
+<Aside type="tip">
+  Free Let's Encrypt certificates expire every 90 days. If you use them, make sure auto-renewal is working and monitor expiry dates.
+</Aside>
+
+---
+
+## SSL Grade
+
+**Handler:** `ssl-labs`
+
+Submits the domain to the Qualys SSL Labs API for a deep analysis of the server's SSL/TLS configuration. Returns a letter grade from A+ to F based on protocol support, key exchange strength, cipher strength, and certificate validity. If the domain resolves to multiple IPs, each endpoint is tested separately.
+
+**Why it matters:** The grade provides a single at-a-glance indicator of your TLS posture. Sites graded C or below are using weak cryptography that may be exploitable.
+
+**Good result:** Grade A or A+. An A+ requires HSTS with a long `max-age`.
+
+**Bad result:** Grade C or below. Grade B typically means the server still supports TLS 1.0/1.1. Grade F indicates a critical issue such as an expired certificate or vulnerability to known attacks (POODLE, Heartbleed).
+
+---
+
+## TLS Configuration
+
+**Handler:** `tls`
+
+Analyzes TLS protocol configuration via Mozilla Observatory. Checks which TLS versions the server supports, what cipher suites it offers, and the overall configuration quality.
+
+**Why it matters:** Weak TLS configurations allow attackers to intercept or decrypt traffic. PCI DSS compliance requires TLS 1.2 or higher.
+
+**Good result:** TLS 1.3 with AEAD cipher suites (AES-GCM, ChaCha20-Poly1305) and Perfect Forward Secrecy (PFS).
+
+**Bad result:** TLS 1.0 or 1.1 still enabled, weak cipher suites (RC4, DES, 3DES), or missing Perfect Forward Secrecy.
+
+<Aside type="caution">
+  TLS 1.0 and 1.1 were deprecated in 2021 (RFC 8996). If your server still supports them, update your configuration immediately.
+</Aside>
+
+---
+
+## HSTS
+
+**Handler:** `hsts`
+
+Checks for the `Strict-Transport-Security` response header and queries the HSTS preload list. HSTS instructs browsers to always connect over HTTPS, preventing SSL stripping attacks.
+
+**Why it matters:** Without HSTS, a user typing `example.com` into their browser briefly connects over plain HTTP before being redirected. An attacker on the same network can intercept that initial request.
+
+**Good result:** Header present with `max-age` of at least 31536000 (1 year), `includeSubDomains` directive, and listed on the HSTS preload list.
+
+**Bad result:** Header missing entirely (vulnerable to downgrade attacks), or `max-age` set too low (under 6 months weakens protection significantly).
+
+<Aside type="tip">
+  HSTS preloading hardcodes HTTPS into browsers so even the very first visit is protected. Submit your domain at [hstspreload.org](https://hstspreload.org/).
+</Aside>
+
+---
+
+## HTTP Security Headers
+
+**Handler:** `http-security`
+
+Scores five critical HTTP security headers that defend against common web attacks:
+
+| Header | Protects against |
+|---|---|
+| `Content-Security-Policy` | Cross-site scripting (XSS) |
+| `X-Frame-Options` | Clickjacking |
+| `X-Content-Type-Options` | MIME type sniffing |
+| `Referrer-Policy` | URL and session token leakage |
+| `Permissions-Policy` | Unauthorized access to browser APIs (camera, mic, geolocation) |
+
+**Why it matters:** These headers are a defense-in-depth layer. Even if your application code is secure, missing headers leave users exposed to client-side attacks.
+
+**Good result:** All five headers present and correctly configured.
+
+**Bad result:** One or more missing. A missing CSP is the most critical gap — it is the primary defense against XSS, the most common web vulnerability.
+
+---
+
+## Firewall (WAF)
+
+**Handler:** `firewall`
+
+Detects Web Application Firewalls by analyzing HTTP response headers, cookies, and server signatures. Identifies common WAF products including Cloudflare, AWS WAF, Akamai, Imperva, Sucuri, and others.
+
+**Why it matters:** WAFs filter malicious traffic and protect against SQL injection, XSS, and other OWASP Top 10 attacks before they reach your application.
+
+**Good result:** WAF detected. This means an additional protection layer sits between attackers and your application.
+
+**Bad result:** No WAF detected. This is not necessarily a vulnerability, but it does mean the application relies entirely on code-level security with no external filtering.
+
+<Aside type="note">
+  WAF detection is informational. Some WAFs are configured to hide their presence, so a "not detected" result does not guarantee no WAF is in place.
+</Aside>
+
+---
+
+## security.txt
+
+**Handler:** `security-txt`
+
+Fetches and parses `/.well-known/security.txt`, the standard (RFC 9116) for websites to communicate vulnerability disclosure policies. Checks for required fields like `Contact` and `Expires`.
+
+**Why it matters:** Without a security.txt file, security researchers who discover vulnerabilities have no clear path to report them responsibly. This can lead to public disclosure without prior notice.
+
+**Good result:** File present with a valid `Contact` field (email or URL), an `Expires` date in the future, and optionally a PGP encryption key.
+
+**Bad result:** File missing or expired. Missing is not a critical vulnerability, but it is recommended by the IETF and increasingly expected for any production website.
+
+---
+
+## Threats
+
+**Handler:** `threats`
+
+Cross-references the URL against four threat intelligence databases:
+
+| Database | What it checks |
+|---|---|
+| Google Safe Browsing | Malware, phishing, unwanted software |
+| URLHaus | Known malware distribution URLs |
+| PhishTank | Confirmed phishing URLs |
+| Cloudmersive | Virus and threat scanning |
+
+**Why it matters:** A site flagged by Google Safe Browsing shows warnings in Chrome, Firefox, and Safari, which can devastate traffic overnight. Regularly checking your own domains catches compromises early.
+
+**Good result:** Not flagged by any database.
+
+**Bad result:** Flagged by one or more databases. Even a single flag warrants immediate investigation — it may indicate the site has been compromised or is hosting injected malware.
+
+<Aside type="note">
+  The Cloudmersive check requires the `CLOUDMERSIVE_API_KEY` environment variable. The other three databases are checked without any key.
+</Aside>
+
+---
+
+## Block Lists
+
+**Handler:** `block-lists`
+
+Checks whether the domain appears on 17 major DNS-based block lists (DNSBLs) including AdGuard, CleanBrowsing, Cloudflare Family, OpenDNS, Norton ConnectSafe, Quad9, and Yandex Safe Browsing.
+
+**Why it matters:** Being listed on a block list means users who rely on that DNS provider cannot access your site at all. Corporate networks frequently use DNS filtering, so a listing can block access for entire organizations.
+
+**Good result:** Not listed on any of the 17 block lists.
+
+**Bad result:** Listed on one or more. False positives do happen (especially on shared hosting), so investigate the listing and file a removal request if unwarranted.
+
+---
+
+## VirusTotal
+
+**Handler:** `virustotal`
+
+Submits the URL to VirusTotal, which scans it against 70+ antivirus engines and security vendors including Google Safe Browsing, Kaspersky, BitDefender, and Sophos. Returns the number of engines that flagged the URL as malicious or suspicious.
+
+**Why it matters:** VirusTotal aggregates the broadest set of security verdicts available. Even a few detections are a strong signal that something is wrong.
+
+**Good result:** Zero detections across all engines.
+
+**Bad result:** Any detections. Even 1-2 warrant investigation (false positives exist), but multiple flags are a very strong signal of compromise.
+
+<Aside type="caution">
+  Requires the `VIRUSTOTAL_API_KEY` environment variable. Free tier allows 500 requests per day. Without the key, this check is skipped.
+</Aside>
+
+---
+
+## AbuseIPDB
+
+**Handler:** `abuse-ipdb`
+
+Resolves the domain to an IP address and checks it against AbuseIPDB, a community-driven database of reported malicious IPs. Returns an abuse confidence score (0-100%), total reports, ISP, and usage type.
+
+**Why it matters:** A high abuse confidence score means the IP hosting your site has been repeatedly reported for spam, brute-force attacks, or DDoS activity. This can affect email deliverability and reputation.
+
+**Good result:** Low confidence score (below 25%) with few or no recent reports.
+
+**Bad result:** High confidence score (above 25%). Note that shared hosting IPs may have elevated scores due to other tenants on the same IP — check the usage type to distinguish.
+
+<Aside type="caution">
+  Requires the `ABUSEIPDB_API_KEY` environment variable. Free tier allows 1,000 checks per day. Without the key, this check is skipped.
+</Aside>
+
+---
+
+## WordPress
+
+**Handler:** `wordpress`
+
+Passively scans the website to detect whether it runs WordPress. If detected, enumerates plugins, themes, and their exposed version numbers from the page HTML. Checks for commonly exploited files and endpoints:
+
+| Target | Risk |
+|---|---|
+| `xmlrpc.php` | Brute-force login attacks, DDoS amplification via pingbacks |
+| `wp-content/debug.log` | Leaks database queries, file paths, PHP errors |
+| Config backups | Leaks database credentials |
+| User enumeration endpoints | Reveals valid usernames for brute-force attacks |
+
+**Why it matters:** WordPress powers over 40% of the web, making it a prime target. Outdated plugins are the single most common WordPress attack vector.
+
+**Good result:** WordPress core, plugins, and themes are all up to date. No debug logs or config backups are publicly accessible. `xmlrpc.php` is blocked or disabled.
+
+**Bad result:** Outdated plugins with known CVEs, publicly accessible debug logs, or exposed `xmlrpc.php`.
+
+<Aside type="note">
+  No API key required. All detection is performed using publicly visible data in the HTML response.
+</Aside>

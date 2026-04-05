@@ -1,0 +1,115 @@
+---
+title: Content Checks
+description: "5 content checks: robots.txt, sitemap, social tags, links, SEO audit"
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+recon-web runs 5 content checks that analyze how the site communicates with search engines, social platforms, and users through its on-page structure and metadata.
+
+---
+
+## robots.txt
+
+**Handler:** `robots-txt`
+
+Fetches and parses the `/robots.txt` file, which tells search engine crawlers which pages to index and which to skip. Extracts `User-Agent` rules, `Disallow`/`Allow` directives, `Crawl-delay` settings, and sitemap references.
+
+**Why it matters:** A misconfigured robots.txt can accidentally hide an entire site from search engines or, conversely, expose paths that should remain private. Attackers also read robots.txt to discover admin panels and sensitive directories.
+
+**Good result:** File present, not blocking important pages, and not inadvertently revealing sensitive paths. A `Sitemap` directive points to the XML sitemap.
+
+**Bad result:** `Disallow: /` blocking all crawlers (sometimes set during development and never removed), or listing paths like `/admin`, `/wp-login`, `/api` that help attackers find entry points. Missing file means crawlers index everything, including staging content or internal API docs.
+
+<Aside type="tip">
+  robots.txt is a public file and is not a security mechanism. Never rely on it to hide sensitive content — use authentication and access controls instead.
+</Aside>
+
+---
+
+## Sitemap
+
+**Handler:** `sitemap`
+
+Finds and parses the XML sitemap. First checks for a sitemap reference in robots.txt, then tries common paths (`/sitemap.xml`, `/sitemap_index.xml`). Counts the number of URLs and extracts the sitemap structure.
+
+**Why it matters:** Sitemaps help search engines discover all pages on your site and understand its hierarchy. Without one, search engines rely solely on link crawling, which is slower and less complete.
+
+**Good result:** Sitemap found, well-formed XML, and contains current URLs. Sitemap index present for large sites with multiple sitemap files.
+
+**Bad result:** No sitemap found (search engines may miss pages, especially on large or JavaScript-rendered sites). Outdated sitemap listing removed pages causes crawl waste and 404 errors in search results.
+
+---
+
+## Social Tags
+
+**Handler:** `social-tags`
+
+Extracts social sharing metadata from the page HTML:
+
+| Tag type | Platform | Key properties |
+|---|---|---|
+| OpenGraph (`og:`) | Facebook, LinkedIn, Discord | `og:title`, `og:description`, `og:image`, `og:url` |
+| Twitter Cards (`twitter:`) | X (Twitter) | `twitter:card`, `twitter:title`, `twitter:description`, `twitter:image` |
+| Standard meta | All platforms (fallback) | `<title>`, `meta description` |
+
+**Why it matters:** These tags control how the page appears when shared on social media. Missing tags mean platforms generate their own (often poor) preview, which reduces click-through rates.
+
+**Good result:** Complete OpenGraph tags including `og:image` (with a large, high-quality image), `og:title`, `og:description`, and matching Twitter Card tags. Meta description present and concise (under 160 characters).
+
+**Bad result:** Missing `og:image` (shared links show no preview image, dramatically lowering engagement), wrong `og:title` or `og:description` (misleading previews), or no meta description (search engines generate a random snippet).
+
+<Aside type="tip">
+  Use the `summary_large_image` Twitter card type for 2-3x more engagement than `summary`. Test your tags with the [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) and [Twitter Card Validator](https://cards-dev.twitter.com/validator).
+</Aside>
+
+---
+
+## Linked Pages
+
+**Handler:** `linked-pages`
+
+Analyzes all links (`<a href="...">`) on the page. Counts internal links (same domain), external links (different domains), and identifies which external domains are linked to.
+
+**Why it matters:** Link structure affects both SEO and security. Too many external links dilute page authority and can look spammy. Links to compromised or malicious sites can get your own domain penalized by search engines.
+
+**Good result:** A healthy mix of internal links (good for navigation and SEO) with a reasonable number of external links to reputable domains. No broken links.
+
+**Bad result:** Very high external link ratio (may indicate spam or a compromised page with injected links), links to known malicious domains, or an excessive total link count that suggests automated content.
+
+<Aside type="note">
+  This check analyzes the initial HTML response. Links injected by JavaScript after page load may not be captured.
+</Aside>
+
+---
+
+## SEO Audit
+
+**Handler:** `seo`
+
+Performs a comprehensive on-page SEO audit by fetching the HTML and analyzing key ranking factors. Returns a score from 0 to 100 based on the issues found.
+
+**Factors checked:**
+
+| Factor | What it checks |
+|---|---|
+| Title tag | Present, correct length (50-60 chars) |
+| Meta description | Present, correct length (120-160 chars) |
+| Headings | Exactly one H1, logical heading hierarchy (H1 > H2 > H3) |
+| Images | Alt text coverage on all `<img>` elements |
+| Canonical URL | `<link rel="canonical">` present and correct |
+| Viewport meta | `<meta name="viewport">` present for mobile support |
+| Structured data | JSON-LD schema markup (enables rich snippets) |
+| Hreflang | Language/region tags for multilingual sites |
+| Meta robots | No unintentional `noindex` or `nofollow` |
+| Content quality | Word count, text-to-HTML ratio |
+
+**Why it matters:** On-page SEO directly affects search engine rankings. Missing titles, duplicate H1s, and images without alt text are among the most common issues that prevent pages from ranking well.
+
+**Good result:** Score of 80 or above. Title and meta description present with correct length, single H1, all images have alt text, canonical URL set, structured data present.
+
+**Bad result:** Score below 50. Typical issues include missing title tag, no H1 (or multiple H1s), images without alt text (accessibility and SEO issue), missing structured data (no rich snippets in search results), or thin content (fewer than 300 words).
+
+<Aside type="caution">
+  A page with `noindex` in the meta robots tag or robots.txt will not appear in search results regardless of how well-optimized the content is. Make sure this directive is intentional.
+</Aside>

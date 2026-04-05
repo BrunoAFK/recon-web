@@ -1,0 +1,137 @@
+---
+title: Meta Checks
+description: "7 meta checks: WHOIS, archives, ranking, tech stack, screenshot"
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+recon-web runs 7 meta checks that gather contextual information about the domain — its registration history, popularity, technology stack, and visual appearance.
+
+---
+
+## WHOIS
+
+**Handler:** `whois`
+
+Performs a WHOIS lookup to retrieve domain registration details: registrar, creation date, expiration date, nameservers, and (if not privacy-protected) registrant contact information.
+
+**Why it matters:** WHOIS data reveals how long a domain has existed, when it expires, and who manages it. This is essential context for trust assessment and due diligence.
+
+**Good result:** Domain registered with a reputable registrar, well before its current use, with an expiration date far in the future. Nameservers match the expected DNS provider.
+
+**Bad result:** Domain expiring soon (risk of being snatched by squatters if renewal is missed), or recently registered (domains under 6 months old are statistically more likely to be used for phishing or spam).
+
+<Aside type="tip">
+  Set up domain expiry alerts with your registrar. Losing a domain because of a missed renewal is one of the most preventable and damaging mistakes.
+</Aside>
+
+---
+
+## Archive History
+
+**Handler:** `archives`
+
+Queries the Wayback Machine (Internet Archive) for historical snapshots of the site. Returns the total number of times the site has been archived and the date range of captures.
+
+**Why it matters:** Archive history provides context about a site's longevity and evolution. A site with no archive history might be brand new, which is a potential red flag for scam or phishing sites.
+
+**Good result:** Multiple snapshots spanning a long time period, consistent with the domain's registration age. Indicates a legitimate, established website.
+
+**Bad result:** No snapshots (site is very new or has blocked the Wayback Machine), or a long gap in captures followed by a sudden restart (may indicate the domain changed hands).
+
+<Aside type="note">
+  This check is informational. Archived versions can reveal previous content, owners, or security issues that were fixed. Legal disputes sometimes use Wayback Machine captures as evidence.
+</Aside>
+
+---
+
+## Domain Ranking
+
+**Handler:** `rank`
+
+Checks the domain's position in the Tranco top-1M list, a research-grade ranking based on Chrome User Experience Report data and Cloudflare DNS query volume. A lower rank number means higher popularity.
+
+**Why it matters:** Domain ranking provides an objective popularity signal. High-ranking domains are well-known and widely visited, which is useful context for risk assessment and competitive analysis.
+
+**Good result:** Domain appears in the ranking. A position in the top 100K indicates a well-known site.
+
+**Bad result:** Domain is not ranked. This simply means the site is outside the top 1 million — it is not necessarily a problem for smaller or niche sites.
+
+---
+
+## Legacy Ranking
+
+**Handler:** `legacy-rank`
+
+Checks the domain's position in the Cisco Umbrella (formerly OpenDNS) popularity ranking. This provides an alternative popularity signal based on DNS query volume across enterprise networks.
+
+**Why it matters:** Umbrella ranking complements Tranco by reflecting enterprise DNS traffic patterns. Comparing both rankings reveals whether a site is more popular with businesses or consumers.
+
+**Good result:** Domain appears in the Umbrella ranking, indicating steady DNS query volume from enterprise networks.
+
+**Bad result:** Domain is not ranked. As with Tranco, this is not necessarily negative for smaller sites.
+
+<Aside type="note">
+  Enterprise-focused domains may rank higher on Umbrella than on consumer-oriented rankings. Newly malicious domains rarely appear on the list, so absence is a weak (but not reliable) trust signal.
+</Aside>
+
+---
+
+## Features
+
+**Handler:** `features`
+
+Detects site features and technologies using the BuiltWith API. Identifies CMS platforms, frameworks, analytics tools, advertising networks, CDNs, payment processors, and other technology integrations.
+
+**Why it matters:** Understanding the technology stack behind a site is valuable for security auditing (known vulnerability patterns), competitive analysis, and technology discovery.
+
+**Good result:** Technologies detected and identified. Results typically include CMS, JavaScript frameworks, analytics tools, and hosting infrastructure.
+
+**Bad result:** No results (API key missing or site uses no detectable technologies).
+
+<Aside type="caution">
+  Requires the `BUILT_WITH_API_KEY` environment variable. Without the key, this check is skipped.
+</Aside>
+
+---
+
+## Tech Stack
+
+**Handler:** `tech-stack`
+
+Detects technologies from HTTP headers, meta tags, HTML patterns, and JavaScript libraries without any API key. Identifies:
+
+- **Frameworks:** React, Vue, Angular, Next.js, Nuxt, Svelte
+- **Server software:** nginx, Apache, IIS, Express, Caddy
+- **CMS platforms:** WordPress, Drupal, Joomla, Ghost, Squarespace
+- **CDNs:** Cloudflare, Fastly, Akamai, AWS CloudFront
+- **Analytics:** Google Analytics, Plausible, Matomo, Hotjar
+- **Other:** jQuery versions, font services, tag managers
+
+**Why it matters:** Knowing the tech stack narrows the attack surface for security testing. Outdated jQuery versions have known XSS vulnerabilities. Identifying the server-side framework reveals which common vulnerability patterns to check.
+
+**Good result:** Technologies detected and listed. All detected versions are current and actively maintained.
+
+**Bad result:** Outdated library versions with known vulnerabilities (e.g., jQuery < 3.5.0), or server headers revealing exact software versions that aid targeted attacks.
+
+<Aside type="note">
+  No API key required. This check uses only publicly visible data from HTTP responses and HTML source. For deeper technology detection, see the [Features](#features) check which uses the BuiltWith API.
+</Aside>
+
+---
+
+## Screenshot
+
+**Handler:** `screenshot`
+
+Captures a full-viewport screenshot of the website using a headless Chromium browser. The screenshot shows how the site actually renders, including JavaScript-generated content.
+
+**Why it matters:** A screenshot provides a visual record of the site at the time of the scan. This is useful for detecting defacements, comparing changes across scans, identifying cloaking (showing different content to bots versus users), and archival documentation.
+
+**Good result:** Screenshot captured successfully, showing the site as expected.
+
+**Bad result:** Screenshot failed (Chromium not available), or the rendered page looks different from what was expected (potential compromise, broken layout, or cloaking).
+
+<Aside type="note">
+  Requires a Chromium or Chrome binary. Set the `CHROME_PATH` environment variable if the binary is not in a standard location. When running in Docker, Chromium is included in the image.
+</Aside>

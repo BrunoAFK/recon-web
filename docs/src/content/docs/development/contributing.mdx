@@ -1,0 +1,162 @@
+---
+title: Contributing
+description: Set up development environment and contribute to recon-web
+---
+
+import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+## Prerequisites
+
+| Tool | Minimum version |
+|---|---|
+| Node.js | 24+ |
+| npm | 10+ |
+| Git | latest |
+
+## Setup
+
+<Steps>
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/user/recon-web.git
+   cd recon-web
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   npm install
+   ```
+
+   npm workspaces will hoist shared dependencies and link the five packages together automatically.
+
+</Steps>
+
+## Development servers
+
+<Tabs>
+  <TabItem label="API">
+    ```bash
+    npm run dev
+    ```
+    Starts the Fastify API server on **http://localhost:3000** with file-watch restarts.
+  </TabItem>
+  <TabItem label="Web UI">
+    ```bash
+    npm run dev:web
+    ```
+    Starts the Vite dev server on **http://localhost:5173** with hot module replacement. The dev server proxies API requests to port 3000, so run both commands in parallel for a full-stack environment.
+  </TabItem>
+</Tabs>
+
+## Building
+
+Core must be compiled before packages that depend on it. The recommended build order:
+
+```bash
+# Build core first (other packages reference its types)
+npx tsc -b packages/core
+
+# Build everything
+npx tsc --build
+
+# Build the web frontend (production bundle)
+npm run build -w @recon-web/web
+```
+
+<Aside type="caution">
+If you change types in `@recon-web/core`, always rebuild core before running the API or CLI — otherwise you will see stale type declarations.
+</Aside>
+
+## Testing
+
+<Tabs>
+  <TabItem label="Core">
+    ```bash
+    npm test -w @recon-web/core
+    ```
+    Runs approximately **109 tests** covering all handlers, the runner, and utility functions. Tests use **Vitest** with **MSW** for HTTP mocking.
+  </TabItem>
+  <TabItem label="CLI">
+    ```bash
+    npm test -w @recon-web/cli
+    ```
+    Runs approximately **17 tests** verifying command generation and output formatting.
+  </TabItem>
+  <TabItem label="API">
+    ```bash
+    npm test -w @recon-web/api
+    ```
+    Tests the Fastify routes, database layer, and SSE streaming.
+
+    <Aside type="tip">
+    If you recently changed your Node.js version you may need to rebuild the native SQLite binding first:
+
+    ```bash
+    npm rebuild better-sqlite3
+    ```
+    </Aside>
+  </TabItem>
+</Tabs>
+
+### Running all tests
+
+```bash
+npm test --workspaces
+```
+
+## Linting and type checking
+
+```bash
+# ESLint across all packages
+npm run lint
+
+# TypeScript type checking (no emit)
+npm run typecheck
+```
+
+## Docker builds
+
+You can build a production Docker image for the API server:
+
+```bash
+docker build -f packages/api/Dockerfile -t recon-web-api:test .
+```
+
+<Aside>
+The Docker build context is the repository root so that workspace dependencies are available during the build.
+</Aside>
+
+## Pull request guidelines
+
+<Steps>
+
+1. **Branch from `main`**
+
+   ```bash
+   git checkout -b feat/my-change main
+   ```
+
+2. **Make your changes** — follow existing code style, add or update tests.
+
+3. **Verify locally**
+
+   ```bash
+   npm run lint
+   npm run typecheck
+   npm test --workspaces
+   ```
+
+4. **Commit with a descriptive message**
+
+   Use conventional-style prefixes where appropriate (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
+
+   ```bash
+   git commit -m "feat(core): add robots-txt handler"
+   ```
+
+5. **Push and open a pull request** against `main`. The CI pipeline will run lint, tests, audit, a Docker build, and Trivy scanning automatically.
+
+</Steps>

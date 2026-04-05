@@ -1,0 +1,92 @@
+---
+title: Web UI
+description: Using the recon-web web interface
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+The recon-web web UI is a single-page application that lets you scan any website, explore results in real time, and manage scan history from the browser. By default it is served at [http://localhost:8080](http://localhost:8080).
+
+## Dashboard overview
+
+The home page is centred around a single URL input. Type a full URL (including `https://`) and press **Scan** to kick off an analysis. Once the scan starts, the dashboard switches to a results view where check cards appear one by one as they complete.
+
+## Starting a scan
+
+<Steps>
+1. Enter the target URL in the input field (e.g. `https://example.com`).
+2. Press **Scan** or hit Enter.
+3. The UI connects to the API via server-sent events and streams results as each handler finishes.
+</Steps>
+
+<Aside type="tip">
+  You can share a scan URL directly. The target is encoded in the query string, so bookmarking or sharing the link lets others see the same scan.
+</Aside>
+
+## Real-time streaming
+
+recon-web uses **Server-Sent Events (SSE)** to push results to the browser the moment each check finishes. A progress bar at the top tracks overall completion so you can tell at a glance how far along the scan is. There is no need to wait for the full scan to finish before reading results.
+
+## Filtering results
+
+### Category filters
+
+Every check belongs to one of six categories. Click a category pill to show only results in that group:
+
+| Category | What it covers |
+|---|---|
+| **Security** | TLS/SSL, HTTP security headers, cookies, CORS, CSP, known vulnerabilities |
+| **DNS** | A, AAAA, MX, TXT, CNAME, NS records, DNSSEC, CAA, mail config |
+| **Network** | Open ports, traceroute, IP geolocation, ASN, firewall detection |
+| **Content** | Tech stack, CMS, linked pages, canonical tags, robots.txt, sitemap |
+| **Meta** | WHOIS, domain age, Tranco ranking, social tags, favicon, language |
+| **Performance** | Lighthouse scores, page load timing, resource sizes, redirects, compression |
+
+### Status filters
+
+Each result card has a coloured status indicator. Click a status pill to filter by outcome:
+
+| Status | Meaning |
+|---|---|
+| **OK** (green) | Check passed with no issues |
+| **Issues** (red) | A potential problem or misconfiguration was detected |
+| **Info** (grey) | Informational data -- useful context, nothing actionable |
+| **Skipped** (dimmed) | Check could not run (missing API key, target unresponsive, etc.) |
+
+### Search
+
+The search box above the results lets you filter by keyword. It matches against check names and result content, so typing `ssl` narrows the list to SSL-related results instantly.
+
+### Sorting
+
+Click the **A-Z** toggle to sort results alphabetically by check name. This is helpful when you know the exact check you are looking for.
+
+<Aside type="note">
+  Filters combine. For example, selecting the **Security** category and the **Issues** status shows only security checks that flagged a problem.
+</Aside>
+
+## Viewing details
+
+Each result card has two action icons in its header:
+
+- **Info icon** -- opens a plain-language explanation of what the check does, why it matters, and what to do if it flagged an issue.
+- **Code icon** -- shows the raw JSON response returned by the handler. This is the same payload you would get from the REST API, useful for automation or debugging.
+
+## Scan history
+
+Every completed scan is saved automatically. Open the **History** page from the sidebar to browse past scans. Each entry shows the target URL, the date and time, and a summary of the results.
+
+### Comparing scans side-by-side
+
+Select any two scans from the history list and click **Compare**. The comparison view shows a side-by-side diff highlighting what changed between the two scans -- for example a new open port, an expiring SSL certificate, or a DNS record change. You can compare scans of the same target over time or scans of different targets.
+
+## Downloading reports
+
+From the history detail view, click **Download** to export the scan:
+
+- **HTML** -- a self-contained report you can open in any browser or email to a colleague.
+- **PDF** -- a print-ready document (requires Chromium on the server for rendering).
+
+## Dark and light mode
+
+The UI respects your system colour-scheme preference and includes a toggle in the top bar to switch between dark and light mode manually.

@@ -9,14 +9,12 @@ export function TxtRecordsRenderer({ data }: RendererProps) {
   let records: string[] = [];
 
   if (Array.isArray(data)) {
-    // Could be string[][] or string[] — handle both
     records = data.flatMap((item) => {
       if (typeof item === "string") return [item];
       if (Array.isArray(item)) return item.filter((s): s is string => typeof s === "string");
       return [String(item)];
     });
   } else if (typeof data === "object") {
-    // Could be { records: string[][] } or similar wrapper
     const d = data as Record<string, unknown>;
     const inner = d.records ?? d.txtRecords ?? d.txt;
     if (Array.isArray(inner)) {
@@ -25,6 +23,18 @@ export function TxtRecordsRenderer({ data }: RendererProps) {
         if (Array.isArray(item)) return item.filter((s): s is string => typeof s === "string");
         return [String(item)];
       });
+    } else {
+      // Key-value format: { "v": "spf1...", "google-site-verification": "abc" }
+      // Convert to "key=value" strings, skipping known wrapper keys
+      const skipKeys = new Set(["records", "txtRecords", "txt"]);
+      for (const [key, value] of Object.entries(d)) {
+        if (skipKeys.has(key)) continue;
+        if (value === "") {
+          records.push(key);
+        } else {
+          records.push(`${key}=${String(value)}`);
+        }
+      }
     }
   }
 

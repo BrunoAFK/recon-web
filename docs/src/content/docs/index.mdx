@@ -1,0 +1,40 @@
+---
+title: recon-web Documentation
+description: Open-source website reconnaissance and security analysis tool.
+template: splash
+hero:
+  title: recon-web
+  tagline: Scan any website. Get the full picture — security, DNS, performance, tech stack — in seconds.
+  actions:
+    - text: Get Started
+      link: /recon-web/getting-started/quick-start/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/BrunoAFK/recon-web
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What is recon-web?
+
+recon-web runs **39 checks** against any website and presents the results in a clean dashboard. It covers security, DNS, network, content, metadata, and performance — all from a single scan.
+
+Use it from the **web UI**, **REST API**, or **command line**.
+
+<CardGrid>
+  <Card title="Quick Start" icon="rocket">
+    Up and running in under a minute with Docker or Node.js. [Get started →](/recon-web/getting-started/quick-start/)
+  </Card>
+  <Card title="39 Checks" icon="magnifier">
+    SSL, DNS, open ports, tech stack, SEO, and more. [See all checks →](/recon-web/checks/overview/)
+  </Card>
+  <Card title="REST API" icon="setting">
+    Swagger-documented API with SSE streaming. [API guide →](/recon-web/guides/rest-api/)
+  </Card>
+  <Card title="Self-hosted" icon="server">
+    Docker, Kubernetes, or bare Node.js. Your data stays with you. [Deploy →](/recon-web/deployment/docker-local/)
+  </Card>
+</CardGrid>

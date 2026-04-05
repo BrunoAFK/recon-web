@@ -1,0 +1,86 @@
+---
+title: Quick Start
+description: Get recon-web running in under a minute
+---
+
+import { Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+There are several ways to get recon-web up and running. Pick the method that suits your workflow best.
+
+<Tabs>
+  <TabItem label="Docker (One-liner)">
+    The fastest way to run a scan — no setup required. Just pull and run:
+
+    ```bash
+    docker run --rm ghcr.io/brunoafk/recon-web/cli scan example.com
+    ```
+
+    This pulls the latest CLI image, scans the target, prints the results to stdout, and cleans up the container automatically.
+  </TabItem>
+
+  <TabItem label="Docker Compose">
+    For the full experience — web UI, persistent history, and all services — use Docker Compose.
+
+    <Steps>
+      1. Clone the repository:
+         ```bash
+         git clone https://github.com/brunoafk/recon-web.git
+         cd recon-web
+         ```
+
+      2. Create your environment file:
+         ```bash
+         cp .env.example .env
+         ```
+
+      3. Start all services:
+         ```bash
+         docker compose up
+         ```
+
+      4. Open the web UI at [http://localhost:8080](http://localhost:8080) and run your first scan.
+    </Steps>
+  </TabItem>
+
+  <TabItem label="From Source">
+    If you want to develop or customize recon-web, run it directly with Node.js.
+
+    **Prerequisites:** Node.js 24+ and npm.
+
+    <Steps>
+      1. Clone and install dependencies:
+         ```bash
+         git clone https://github.com/brunoafk/recon-web.git
+         cd recon-web
+         npm install
+         ```
+
+      2. Copy the example environment file:
+         ```bash
+         cp .env.example .env
+         ```
+
+      3. Start the API server and web UI in separate terminals:
+         ```bash
+         # Terminal 1 — API server
+         npm run dev
+
+         # Terminal 2 — Web UI
+         npm run dev:web
+         ```
+
+      4. Open [http://localhost:8080](http://localhost:8080) in your browser.
+    </Steps>
+  </TabItem>
+</Tabs>
+
+## What you'll see
+
+Once everything is running, the scan flow works like this:
+
+1. You enter a target URL in the web UI (or pass it as a CLI argument).
+2. recon-web kicks off dozens of security and reconnaissance checks in parallel — DNS lookups, TLS analysis, header inspection, port scanning, performance audits, and more.
+3. Results stream back to the UI in real time via server-sent events. Each check appears as it completes, so you don't have to wait for the full scan to finish.
+4. When all checks are done, the full report is saved to your scan history for later review, comparison, and export.
+
+Head over to [Configuration](/getting-started/configuration/) to add API keys and tune settings, or jump straight to [Your First Scan](/getting-started/first-scan/) for a detailed walkthrough of the results.
