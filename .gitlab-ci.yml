@@ -3,6 +3,7 @@ stages:
   - build
   - scan
   - push
+  - deploy
 
 variables:
   NODE_VERSION: "24"
@@ -164,3 +165,25 @@ push-cli:
     - docker tag ${IMAGE_PREFIX}/cli:${CI_COMMIT_SHA} ${IMAGE_PREFIX}/cli:latest
     - docker push ${IMAGE_PREFIX}/cli:${CI_COMMIT_TAG}
     - docker push ${IMAGE_PREFIX}/cli:latest
+
+# ── Stage 7: Deploy static site to Cloudflare Pages ─────────
+
+deploy-static:
+  stage: deploy
+  image: node:${NODE_VERSION}
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/
+    - when: manual
+      allow_failure: true
+  cache:
+    key: npm-${CI_COMMIT_REF_SLUG}
+    paths:
+      - node_modules/
+  script:
+    - npm ci
+    - npx tsc -b packages/core
+    - npm run build -w @recon-web/static
+    - npx wrangler pages deploy packages/static/dist --project-name=recon-web
+  environment:
+    name: cloudflare-pages
+    url: https://recon-web.pages.dev
