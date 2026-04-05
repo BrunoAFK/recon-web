@@ -1,0 +1,103 @@
+---
+title: Docker (Pre-built Images)
+description: Run recon-web with pre-built images from GitHub Container Registry
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+If you do not need to build from source, you can run recon-web using the pre-built Docker images published to GitHub Container Registry (GHCR). This is the fastest way to deploy without cloning the repository.
+
+## Available images
+
+| Image | Description |
+|---|---|
+| `ghcr.io/brunoafk/recon-web/api` | API server |
+| `ghcr.io/brunoafk/recon-web/web` | Web UI (Nginx frontend) |
+| `ghcr.io/brunoafk/recon-web/cli` | CLI tool |
+
+## Getting started
+
+<Steps>
+1. Create a project directory and add an environment file:
+   ```bash
+   mkdir recon-web && cd recon-web
+   curl -O https://raw.githubusercontent.com/brunoafk/recon-web/main/.env.example
+   cp .env.example .env
+   ```
+
+2. Download the remote Compose file:
+   ```bash
+   curl -O https://raw.githubusercontent.com/brunoafk/recon-web/main/docker-compose.remote.yml
+   ```
+
+3. Start all services:
+   ```bash
+   docker compose -f docker-compose.remote.yml up -d
+   ```
+
+4. Open the web UI at [http://localhost:8080](http://localhost:8080).
+</Steps>
+
+## Version pinning
+
+By default, the `latest` tag is used. To pin to a specific release, set the `TAG` environment variable:
+
+```bash
+TAG=1.0.0 docker compose -f docker-compose.remote.yml up -d
+```
+
+Or in your `.env` file:
+
+```bash
+TAG=1.0.0
+```
+
+<Aside type="tip">
+  Pinning to a specific version is recommended for production deployments. The `latest` tag is updated on every release and may introduce breaking changes.
+</Aside>
+
+## Custom registry
+
+If you mirror the images to a private registry, override the `REGISTRY` variable:
+
+```bash
+REGISTRY=registry.example.com/recon-web docker compose -f docker-compose.remote.yml up -d
+```
+
+The Compose file constructs image references as `${REGISTRY}/api:${TAG}`, `${REGISTRY}/web:${TAG}`, etc.
+
+## Updating
+
+Pull the latest images and restart:
+
+```bash
+docker compose -f docker-compose.remote.yml pull
+docker compose -f docker-compose.remote.yml up -d
+```
+
+To update to a specific version:
+
+```bash
+TAG=1.1.0 docker compose -f docker-compose.remote.yml pull
+TAG=1.1.0 docker compose -f docker-compose.remote.yml up -d
+```
+
+## Running CLI scans
+
+```bash
+docker compose -f docker-compose.remote.yml run --rm cli scan https://example.com
+```
+
+## Data persistence
+
+Scan data is stored in a `scan-data` Docker volume, identical to the [local build setup](/recon-web/deployment/docker-local/). The backup and restore process is the same.
+
+## Stopping
+
+```bash
+# Keep data
+docker compose -f docker-compose.remote.yml down
+
+# Delete data
+docker compose -f docker-compose.remote.yml down -v
+```

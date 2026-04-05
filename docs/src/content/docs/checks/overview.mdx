@@ -1,0 +1,81 @@
+---
+title: Checks Overview
+description: All 39 checks that recon-web runs against a target URL
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Every time you scan a URL, recon-web runs **39 checks** across **6 categories**. Each check runs in parallel so the entire scan typically completes in under 30 seconds.
+
+Some checks depend on optional API keys. Without any keys configured, 34 checks run out of the box. See [Configuration](/recon-web/getting-started/configuration/) for details on adding API keys.
+
+<Aside type="tip">
+  You can run a subset of checks from the CLI with the `--only` and `--skip` flags, or from the API by specifying which handlers to include.
+</Aside>
+
+## All checks by category
+
+| # | Check | Category | Description |
+|---|---|---|---|
+| 1 | [SSL Certificate](/recon-web/checks/security/#ssl-certificate) | Security | Reads the TLS certificate — issuer, expiry, trust chain |
+| 2 | [SSL Grade](/recon-web/checks/security/#ssl-grade) | Security | Letter grade (A+ to F) from Qualys SSL Labs |
+| 3 | [TLS Configuration](/recon-web/checks/security/#tls-configuration) | Security | Protocol version, cipher suites, configuration quality |
+| 4 | [HSTS](/recon-web/checks/security/#hsts) | Security | Strict-Transport-Security header and preload status |
+| 5 | [HTTP Security Headers](/recon-web/checks/security/#http-security-headers) | Security | Scores CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy |
+| 6 | [Firewall (WAF)](/recon-web/checks/security/#firewall-waf) | Security | Detects web application firewalls (Cloudflare, AWS WAF, Akamai, etc.) |
+| 7 | [security.txt](/recon-web/checks/security/#securitytxt) | Security | Checks for a vulnerability disclosure policy file |
+| 8 | [Threats](/recon-web/checks/security/#threats) | Security | Cross-references against Google Safe Browsing, URLHaus, PhishTank, Cloudmersive |
+| 9 | [Block Lists](/recon-web/checks/security/#block-lists) | Security | Checks 17 DNS-based block lists |
+| 10 | [VirusTotal](/recon-web/checks/security/#virustotal) | Security | Scans against 70+ antivirus engines |
+| 11 | [AbuseIPDB](/recon-web/checks/security/#abuseipdb) | Security | IP reputation and abuse confidence scoring |
+| 12 | [WordPress](/recon-web/checks/security/#wordpress) | Security | Detects WordPress, enumerates plugins/themes, finds misconfigurations |
+| 13 | [DNS Records](/recon-web/checks/dns/#dns-records) | DNS | Resolves A, AAAA, MX, NS, TXT, CNAME, SOA, SRV, PTR |
+| 14 | [DNS Provider](/recon-web/checks/dns/#dns-provider) | DNS | Identifies authoritative nameserver and DoH support |
+| 15 | [DNSSEC](/recon-web/checks/dns/#dnssec) | DNS | Validates DNSKEY, DS, and RRSIG records |
+| 16 | [TXT Records](/recon-web/checks/dns/#txt-records) | DNS | Parses SPF, DKIM, domain verification entries |
+| 17 | [Mail Configuration](/recon-web/checks/dns/#mail-configuration) | DNS | MX records, mail provider identification, SPF/DMARC analysis |
+| 18 | [HTTP Status](/recon-web/checks/network/#http-status) | Network | Status code and response time |
+| 19 | [HTTP Headers](/recon-web/checks/network/#http-headers) | Network | Full response header dump |
+| 20 | [Cookies](/recon-web/checks/network/#cookies) | Network | Cookie names and security flags |
+| 21 | [Redirects](/recon-web/checks/network/#redirects) | Network | Full redirect chain with status codes |
+| 22 | [Open Ports](/recon-web/checks/network/#open-ports) | Network | Scans 33 common TCP ports |
+| 23 | [IP Address](/recon-web/checks/network/#ip-address) | Network | Resolves domain to IP |
+| 24 | [Server Location](/recon-web/checks/network/#server-location) | Network | GeoIP lookup with map display |
+| 25 | [Traceroute](/recon-web/checks/network/#traceroute) | Network | Network hops to target |
+| 26 | [robots.txt](/recon-web/checks/content/#robotstxt) | Content | Parses crawler directives |
+| 27 | [Sitemap](/recon-web/checks/content/#sitemap) | Content | Finds and parses XML sitemap |
+| 28 | [Social Tags](/recon-web/checks/content/#social-tags) | Content | OpenGraph, Twitter Cards, meta description |
+| 29 | [Linked Pages](/recon-web/checks/content/#linked-pages) | Content | Internal and external link analysis |
+| 30 | [SEO Audit](/recon-web/checks/content/#seo-audit) | Content | On-page SEO scoring (0-100) |
+| 31 | [WHOIS](/recon-web/checks/meta/#whois) | Meta | Domain registration details |
+| 32 | [Archive History](/recon-web/checks/meta/#archive-history) | Meta | Wayback Machine snapshot count and date range |
+| 33 | [Domain Ranking](/recon-web/checks/meta/#domain-ranking) | Meta | Tranco top-1M popularity ranking |
+| 34 | [Legacy Ranking](/recon-web/checks/meta/#legacy-ranking) | Meta | Cisco Umbrella popularity ranking |
+| 35 | [Features](/recon-web/checks/meta/#features) | Meta | BuiltWith feature and technology detection |
+| 36 | [Tech Stack](/recon-web/checks/meta/#tech-stack) | Meta | Framework, CMS, CDN, analytics detection from HTML/headers |
+| 37 | [Screenshot](/recon-web/checks/meta/#screenshot) | Meta | Visual capture of the rendered page |
+| 38 | [Carbon Footprint](/recon-web/checks/performance/#carbon-footprint) | Performance | Page weight, CO2 estimate, green hosting check |
+| 39 | [PageSpeed](/recon-web/checks/performance/#pagespeed) | Performance | Google Lighthouse performance, accessibility, best practices, SEO scores |
+
+## Category breakdown
+
+| Category | Checks | Focus area |
+|---|---|---|
+| [Security](/recon-web/checks/security/) | 12 | SSL/TLS, headers, WAF, threat intelligence, WordPress |
+| [DNS](/recon-web/checks/dns/) | 5 | Records, DNSSEC, provider, email configuration |
+| [Network](/recon-web/checks/network/) | 8 | Status, headers, cookies, ports, traceroute, geolocation |
+| [Content](/recon-web/checks/content/) | 5 | robots.txt, sitemap, social tags, links, SEO |
+| [Meta](/recon-web/checks/meta/) | 7 | WHOIS, archives, ranking, tech stack, screenshot |
+| [Performance](/recon-web/checks/performance/) | 2 | Carbon footprint, Lighthouse audits |
+
+## Checks requiring API keys
+
+Five checks require optional API keys to function. Without the key, the check is skipped gracefully.
+
+| Check | Environment variable | Free tier |
+|---|---|---|
+| VirusTotal | `VIRUSTOTAL_API_KEY` | 500 requests/day |
+| AbuseIPDB | `ABUSEIPDB_API_KEY` | 1,000 checks/day |
+| PageSpeed | `GOOGLE_CLOUD_API_KEY` | Generous free quota |
+| Features | `BUILT_WITH_API_KEY` | Limited free tier |
+| Threats (partial) | `CLOUDMERSIVE_API_KEY` | Limited free tier |

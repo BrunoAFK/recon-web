@@ -1,0 +1,168 @@
+---
+title: REST API
+description: Using the recon-web REST API
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+The recon-web API is a REST service built on Fastify. It powers the web UI but can be used independently for automation, CI/CD pipelines, or custom integrations.
+
+## Base URL
+
+```
+http://localhost:3000
+```
+
+The port is configurable via the `PORT` environment variable (default `3000`).
+
+## Interactive docs
+
+Swagger UI is available at [`/docs`](http://localhost:3000/docs). It lists every endpoint, shows request/response schemas, and lets you try requests directly from the browser.
+
+## Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health` | Health check -- returns handler count, uptime, and component status |
+| `GET` | `/api/handlers` | List all available analysis handlers with metadata |
+| `GET` | `/api?url=` | Run **all** handlers against a URL (synchronous, returns full results) |
+| `GET` | `/api/stream?url=` | Run all handlers with **SSE streaming** (results arrive as they complete) |
+| `GET` | `/api/<handler>?url=` | Run a **single** handler (e.g. `/api/ssl?url=example.com`) |
+| `GET` | `/api/history` | List past scans (supports `?limit=` and `?offset=` for pagination) |
+| `GET` | `/api/history/:id` | Get a single scan with all handler results |
+| `GET` | `/api/history/:id/report` | Generate an HTML or PDF report (`?format=html` or `?format=pdf`) |
+| `DELETE` | `/api/history/:id` | Delete a scan and its results |
+
+## SSE streaming
+
+The `/api/stream?url=` endpoint uses **Server-Sent Events** to push progress updates as each handler completes. This is what the web UI uses internally.
+
+### Event types
+
+| Event | Payload | When |
+|---|---|---|
+| `scan_started` | `{ type, url, scanId, totalHandlers }` | Scan begins |
+| `handler_started` | `{ type, handler }` | A handler starts executing |
+| `handler_finished` | `{ type, handler, result }` | A handler completes (includes data, error, or skipped) |
+| `scan_completed` | `{ type, scanId, totalHandlers, durationMs }` | All handlers finished |
+
+### Example: consuming SSE with curl
+
+```bash
+curl -N "http://localhost:3000/api/stream?url=https://example.com"
+```
+
+Each line follows the SSE format:
+
+```
+event: scan_started
+data: {"type":"scan_started","url":"https://example.com","scanId":"abc123","totalHandlers":39}
+
+event: handler_finished
+data: {"type":"handler_finished","handler":"ssl","result":{"data":{...}}}
+
+event: scan_completed
+data: {"type":"scan_completed","scanId":"abc123","totalHandlers":39,"durationMs":12450}
+```
+
+### Example: consuming SSE with JavaScript
+
+```js
+const source = new EventSource(
+  "http://localhost:3000/api/stream?url=https://example.com"
+);
+
+source.addEventListener("handler_finished", (e) => {
+  const { handler, result } = JSON.parse(e.data);
+  console.log(`${handler}:`, result);
+});
+
+source.addEventListener("scan_completed", () => {
+  source.close();
+});
+```
+
+## Authentication
+
+When `AUTH_ENABLED=true`, every request to `/api/*` endpoints (except `/api/handlers`) must include a bearer token:
+
+```
+Authorization: Bearer <your-token>
+```
+
+Set the token with the `AUTH_TOKEN` environment variable. See the [Configuration](/recon-web/getting-started/configuration/) reference for details.
+
+<Aside type="caution">
+  Always enable authentication if your instance is exposed to the internet. Without it, anyone can trigger scans from your server.
+</Aside>
+
+## curl examples
+
+### Health check
+
+```bash
+curl http://localhost:3000/health
+```
+
+### List handlers
+
+```bash
+curl http://localhost:3000/api/handlers
+```
+
+### Full scan (synchronous)
+
+```bash
+curl "http://localhost:3000/api?url=https://example.com"
+```
+
+### Single handler
+
+```bash
+curl "http://localhost:3000/api/ssl?url=https://example.com"
+```
+
+### Authenticated request
+
+```bash
+curl -H "Authorization: Bearer my-secret-token" \
+  "http://localhost:3000/api?url=https://example.com"
+```
+
+### List scan history
+
+```bash
+curl "http://localhost:3000/api/history?limit=10&offset=0"
+```
+
+### Get a scan by ID
+
+```bash
+curl http://localhost:3000/api/history/abc123
+```
+
+### Download HTML report
+
+```bash
+curl -o report.html http://localhost:3000/api/history/abc123/report
+```
+
+### Download PDF report
+
+```bash
+curl -o report.pdf "http://localhost:3000/api/history/abc123/report?format=pdf"
+```
+
+### Delete a scan
+
+```bash
+curl -X DELETE http://localhost:3000/api/history/abc123
+```
+
+## Rate limiting
+
+The API enforces a default rate limit of **100 requests per 10-minute window** per IP address. If you exceed this limit you will receive a `429 Too Many Requests` response with a `Retry-After` header.
+
+<Aside type="tip">
+  If you are running recon-web behind a reverse proxy, make sure the proxy forwards the client's real IP address (e.g. via `X-Forwarded-For`) so rate limiting applies per-client rather than per-proxy.
+</Aside>

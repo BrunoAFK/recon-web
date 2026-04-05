@@ -1,0 +1,72 @@
+---
+title: Scheduled Scans
+description: Automate recurring scans with change detection
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+recon-web can run scans on a cron schedule and automatically detect changes between consecutive scans of the same URL. When paired with [notifications](/recon-web/guides/notifications/), this gives you a lightweight monitoring system for your websites.
+
+## Enabling scheduled scans
+
+Add the following to your `.env` file:
+
+```bash
+SCHEDULE_ENABLED=true
+SCHEDULE_URLS=https://example.com,https://another-site.com
+```
+
+That is all you need. The scheduler starts automatically when the API server boots.
+
+## Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `SCHEDULE_ENABLED` | `false` | Set to `true` to activate the scheduler |
+| `SCHEDULE_CRON` | `0 0 * * *` | Cron expression controlling scan frequency |
+| `SCHEDULE_URLS` | _(empty)_ | Comma-separated list of URLs to scan on each tick |
+
+### Cron syntax
+
+The `SCHEDULE_CRON` variable accepts standard five-field cron expressions:
+
+```
+┌───────────── minute (0-59)
+│ ┌───────────── hour (0-23)
+│ │ ┌───────────── day of month (1-31)
+│ │ │ ┌───────────── month (1-12)
+│ │ │ │ ┌───────────── day of week (0-7, 0 and 7 = Sunday)
+│ │ │ │ │
+* * * * *
+```
+
+Common examples:
+
+| Expression | Schedule |
+|---|---|
+| `0 0 * * *` | Daily at midnight (default) |
+| `0 */6 * * *` | Every 6 hours |
+| `0 9 * * 1` | Every Monday at 09:00 |
+| `*/30 * * * *` | Every 30 minutes |
+
+## Change detection
+
+Each time a scheduled scan completes, recon-web compares its results against the most recent previous scan of the same URL. If any handler's data changed -- for example a DNS record was added, an SSL certificate was renewed, or a security header was removed -- the changes are recorded.
+
+Changes are classified by severity:
+
+| Severity | Icon | Examples |
+|---|---|---|
+| **Critical** | `[!!!]` | SSL certificate expired, security header removed |
+| **Warning** | `[!]` | DNS record changed, new open port detected |
+| **Info** | `[i]` | Whois registrar updated, tech stack version bumped |
+
+When notifications are configured, changes are dispatched immediately after detection. See the [Notifications](/recon-web/guides/notifications/) guide for setup instructions.
+
+<Aside type="note">
+  Change detection only triggers on scheduled scans. Manual scans through the web UI or API are saved to history but do not trigger notifications.
+</Aside>
+
+## Kubernetes CronJob alternative
+
+If you are deploying on Kubernetes, you can use a native CronJob instead of the built-in scheduler. This gives you Kubernetes-native retry policies, resource limits, and observability. See the [Kubernetes deployment guide](/recon-web/deployment/kubernetes/) for a ready-made CronJob configuration in the Helm chart's `scanner` section.

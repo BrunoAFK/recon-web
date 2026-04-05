@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { unlinkSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
 import { buildServer } from '../server.js';
 
 let app: FastifyInstance;
 let savedEnv: Record<string, string | undefined>;
+let testDbPath: string;
 
-const AUTH_VARS = ['AUTH_ENABLED', 'AUTH_TOKEN'];
+const AUTH_VARS = ['AUTH_ENABLED', 'AUTH_TOKEN', 'DB_PATH'];
 
 beforeEach(() => {
   // Save current env
@@ -13,9 +16,19 @@ beforeEach(() => {
   for (const key of AUTH_VARS) {
     savedEnv[key] = process.env[key];
   }
+  // Use unique DB per test to avoid SQLITE_BUSY
+  testDbPath = `/tmp/recon-web-auth-test-${randomUUID()}.db`;
+  process.env.DB_PATH = testDbPath;
 });
 
 afterEach(async () => {
+  if (app) {
+    await app.close();
+  }
+  // Clean up test DB
+  try { unlinkSync(testDbPath); } catch {}
+  try { unlinkSync(testDbPath + '-wal'); } catch {}
+  try { unlinkSync(testDbPath + '-shm'); } catch {}
   // Restore env
   for (const key of AUTH_VARS) {
     if (savedEnv[key] === undefined) {
@@ -23,9 +36,6 @@ afterEach(async () => {
     } else {
       process.env[key] = savedEnv[key];
     }
-  }
-  if (app) {
-    await app.close();
   }
 });
 

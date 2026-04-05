@@ -1,0 +1,141 @@
+---
+title: Architecture
+description: "How recon-web is built: monorepo structure, packages, data flow"
+---
+
+import { Aside, Steps, Card, CardGrid, TabItem, Tabs } from '@astrojs/starlight/components';
+
+## Monorepo structure
+
+recon-web is organized as a monorepo using **npm workspaces** and **TypeScript project references**. Each package lives under `packages/` and declares its own `tsconfig.json` that references sibling packages as needed.
+
+```
+recon-web/
+├── packages/
+│   ├── core/       # Handlers, registry, runner, types, utilities
+│   ├── api/        # Fastify REST server + SQLite database
+│   ├── cli/        # Commander CLI
+│   ├── web/        # React SPA
+│   └── static/     # Cloudflare Pages edge deployment
+├── package.json    # Workspace root
+└── tsconfig.json   # Root project references
+```
+
+## Packages
+
+<CardGrid>
+  <Card title="@recon-web/core">
+    **39 handler functions**, the handler registry, the concurrent runner, shared types, and utility functions. Every other package depends on core.
+  </Card>
+  <Card title="@recon-web/api">
+    **Fastify 5** REST server with a **SQLite** database (better-sqlite3), SSE streaming for real-time scan progress, scheduled scans, report generation, and authentication.
+  </Card>
+  <Card title="@recon-web/cli">
+    **Commander**-based CLI. Commands are auto-generated from the handler registry so every registered handler is instantly available on the command line. Supports JSON and JUnit output formats.
+  </Card>
+  <Card title="@recon-web/web">
+    **React 18** single-page application styled with **Tailwind CSS 4**. Uses React Router for navigation, React Query for data fetching, and a real-time scan UI powered by SSE.
+  </Card>
+  <Card title="@recon-web/static">
+    **Cloudflare Pages** edge deployment that runs a subset of approximately 16 HTTP-only handlers without needing a full server.
+  </Card>
+</CardGrid>
+
+## Handler architecture
+
+Every analysis check in recon-web is a **handler** — an async function with a consistent signature:
+
+```ts
+type AnalysisHandler<T> = (url: string, options?: HandlerOptions) => Promise<HandlerResult<T>>;
+```
+
+Handlers are collected in a **registry** that stores metadata alongside each function:
+
+```ts
+registry.register({
+  name: 'ssl-certificate',
+  description: 'Inspect the SSL/TLS certificate chain',
+  category: 'security',
+  requires: [],       // e.g. ['chromium'] or ['apiKey:shodan']
+  handler: sslCertificateHandler,
+});
+```
+
+The registry pattern means the CLI can auto-generate commands, the API can list available checks, and the web UI can render per-handler controls — all driven from a single source of truth.
+
+## Runner
+
+The **runner** executes handlers concurrently using `p-limit` to cap parallelism. Before any handler runs, the runner performs:
+
+1. **URL validation** — rejects malformed input.
+2. **SSRF protection** — blocks private/internal IP ranges.
+3. **Pre-flight checks** — DNS resolution and an initial HTTP probe.
+
+Errors returned from handlers are classified using two enums:
+
+| Concept | Examples |
+|---|---|
+| `ErrorCode` | `TIMEOUT`, `DNS_FAILURE`, `CONNECTION_REFUSED`, `MISSING_API_KEY`, `NO_DATA`, `INVALID_URL`, `SSRF_BLOCKED`, `REQUIRES_CHROMIUM`, `NOT_FOUND` |
+| `ErrorCategory` | `tool` (framework issue), `site` (target issue), `info` (intentionally skipped) |
+
+## Data flow
+
+```
+User
+ │
+ ▼
+Web UI / API / CLI
+ │
+ ▼
+URL validation
+ │
+ ▼
+Pre-flight checks (DNS, HTTP)
+ │
+ ▼
+Create scan record (SQLite)
+ │
+ ▼
+Run handlers concurrently (p-limit)
+ │
+ ▼
+Stream results via SSE
+ │
+ ▼
+Save results to DB
+ │
+ ▼
+Return final results
+```
+
+1. The user submits a URL through one of three entry points: the **web UI**, the **REST API**, or the **CLI**.
+2. The URL is validated and pre-flight checks confirm the target is reachable.
+3. A **scan record** is created in SQLite.
+4. Handlers run concurrently. As each completes, its result is **streamed** to the client over SSE (API/web) or printed incrementally (CLI).
+5. All results are persisted to the `scan_results` table.
+6. The complete scan result set is returned to the caller.
+
+## Database
+
+recon-web uses **SQLite** via `better-sqlite3` for zero-configuration persistence. The schema is minimal:
+
+| Table | Purpose |
+|---|---|
+| `scans` | One row per scan — URL, status, timestamps, metadata |
+| `scan_results` | One row per handler result — linked to a scan, stores the handler name and its JSON output |
+
+<Aside type="tip">
+SQLite is embedded in the API process, so there is no external database to manage. The database file lives at the path configured via the `DATABASE_PATH` environment variable.
+</Aside>
+
+## Key technologies
+
+| Layer | Technology |
+|---|---|
+| Server | Fastify 5 |
+| Database | SQLite (better-sqlite3) |
+| Frontend | React 18, Tailwind CSS 4, React Router, React Query |
+| CLI | Commander |
+| Testing | Vitest, Playwright, MSW |
+| Containerisation | Docker, Helm |
+| Edge | Cloudflare Pages / Workers |

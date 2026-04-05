@@ -1,0 +1,69 @@
+---
+title: Your First Scan
+description: Walk through your first website scan step by step
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+This guide walks you through running a scan and understanding the results.
+
+<Steps>
+
+1. **Enter a URL**
+
+   Open the recon-web home page and type a full URL (e.g., `https://example.com`) into the input field. Press **Scan** to start. The URL must include the protocol — `https://` or `http://`.
+
+2. **Watch results stream in real time**
+
+   recon-web uses **Server-Sent Events (SSE)** to push each check's result to the browser the moment it finishes. You will see a progress bar advance as checks complete, and individual result cards appear on the page one by one. There is no need to wait for the entire scan — you can start reading results immediately.
+
+3. **Understand the results**
+
+   Every check belongs to one of six categories:
+
+   | Category | What it covers |
+   |---|---|
+   | **Security** | TLS/SSL configuration, HTTP security headers, cookie flags, CORS policy, content security policy, known vulnerabilities. |
+   | **DNS** | DNS records (A, AAAA, MX, TXT, CNAME, NS), DNSSEC status, CAA records, mail configuration. |
+   | **Network** | Open ports, traceroute, IP geolocation, ASN information, firewall detection. |
+   | **Content** | Technology stack, CMS detection, linked pages, canonical tags, robots.txt, sitemap analysis. |
+   | **Meta** | WHOIS data, domain age, Tranco ranking, social media tags, favicon, language detection. |
+   | **Performance** | Lighthouse scores, page load timing, resource sizes, redirect chains, compression checks. |
+
+   Each result also has a **status indicator**:
+
+   | Color | Status | Meaning |
+   |---|---|---|
+   | Green | **OK** | The check passed with no issues. |
+   | Red | **Issues** | A potential problem or misconfiguration was detected. |
+   | Grey | **Info** | Informational data — nothing actionable, but useful context. |
+   | Dimmed | **Skipped** | The check could not run (e.g., missing API key or the target did not respond). |
+
+4. **Filter and sort**
+
+   Use the controls above the results to narrow down what you see:
+
+   - **Category pills** — click a category name to show only checks in that category.
+   - **Status pills** — click a status (OK, Issues, Info, Skipped) to filter by outcome.
+   - **Search** — type a keyword to filter results by name or content.
+   - **Sort A-Z** — toggle alphabetical sorting to quickly find a specific check by name.
+
+   Filters combine, so you can for example view only **Security** checks with an **Issues** status.
+
+5. **Explore details**
+
+   Each result card has two action icons:
+
+   - **Info icon** — opens a plain-language explanation of what the check does, why it matters, and what you can do if it flagged an issue.
+   - **Code icon** — shows the raw JSON response returned by the check, useful for automation or debugging.
+
+6. **Review history and compare scans**
+
+   Every scan is saved automatically. Open the **History** page to see all past scans. From there you can:
+
+   - **Compare two scans** — select any two scans of the same (or different) targets and view a side-by-side diff highlighting what changed between them.
+   - **Download reports** — export a scan as a JSON or PDF report for sharing or archival.
+
+</Steps>
+
+You now have everything you need to start scanning. For deeper customization, see the [Configuration](/getting-started/configuration/) reference.

@@ -1,58 +1,133 @@
 import axios from 'axios';
 import * as xml2js from 'xml2js';
-import type { AnalysisHandler, HandlerResult } from '../types.js';
+import type { AnalysisHandler } from '../types.js';
 import { normalizeUrl } from '../utils/url.js';
 
 export interface SitemapResult {
-  urls?: string[];
+  sitemapUrl: string;
+  source: 'direct' | 'robots.txt';
+  type: 'urlset' | 'sitemapindex' | 'unknown';
+  urls: string[];
   message?: string;
   [key: string]: unknown;
 }
 
+/**
+ * Extract all sitemap URLs from robots.txt content.
+ */
+function extractSitemapUrlsFromRobots(robotsTxt: string): string[] {
+  const urls: string[] = [];
+  for (const line of robotsTxt.split('\n')) {
+    const match = line.match(/^\s*sitemap\s*:\s*(.+)/i);
+    if (match) urls.push(match[1].trim());
+  }
+  return urls;
+}
+
+/**
+ * Recursively find all <loc> values in parsed XML, case-insensitive.
+ */
+function extractLocs(obj: unknown): string[] {
+  if (obj == null) return [];
+  if (typeof obj === 'string') return [];
+  if (Array.isArray(obj)) return obj.flatMap(extractLocs);
+
+  const record = obj as Record<string, unknown>;
+  const locs: string[] = [];
+
+  for (const [key, value] of Object.entries(record)) {
+    if (key.toLowerCase() === 'loc') {
+      if (Array.isArray(value)) {
+        for (const v of value) {
+          if (typeof v === 'string') locs.push(v);
+        }
+      } else if (typeof value === 'string') {
+        locs.push(value);
+      }
+    } else if (typeof value === 'object' && value !== null) {
+      locs.push(...extractLocs(value));
+    }
+  }
+  return locs;
+}
+
+/**
+ * Detect sitemap type from parsed XML root keys (case-insensitive).
+ */
+function detectType(parsed: Record<string, unknown>): 'urlset' | 'sitemapindex' | 'unknown' {
+  const rootKey = Object.keys(parsed).find(
+    (k) => k !== '$' && k !== '_',
+  );
+  if (!rootKey) return 'unknown';
+  const lower = rootKey.toLowerCase();
+  if (lower === 'urlset') return 'urlset';
+  if (lower === 'sitemapindex') return 'sitemapindex';
+  return 'unknown';
+}
+
 export const sitemapHandler: AnalysisHandler<SitemapResult> = async (url, options) => {
   const targetUrl = normalizeUrl(url);
-  let sitemapUrl = `${targetUrl}/sitemap.xml`;
-  const hardTimeOut = options?.timeout ?? 5000;
+  const timeout = options?.timeout ?? 10_000;
+  const axiosOpts = { timeout, maxRedirects: 5 };
 
+  // Strategy: try robots.txt first (it often has the canonical sitemap URL),
+  // then fall back to common sitemap paths.
+  const candidates: { url: string; source: 'robots.txt' | 'direct' }[] = [];
+
+  // 1. Try robots.txt for sitemap directives
   try {
-    let sitemapRes;
-    try {
-      sitemapRes = await axios.get(sitemapUrl, { timeout: hardTimeOut });
-    } catch (error) {
-      const axiosError = error as any;
-      if (axiosError.response && axiosError.response.status === 404) {
-        // Try to fetch sitemap URL from robots.txt
-        const robotsRes = await axios.get(`${targetUrl}/robots.txt`, { timeout: hardTimeOut });
-        const robotsTxt: string[] = robotsRes.data.split('\n');
-        let foundSitemapUrl = '';
-
-        for (const line of robotsTxt) {
-          if (line.toLowerCase().startsWith('sitemap:')) {
-            foundSitemapUrl = line.split(' ')[1].trim();
-            break;
-          }
-        }
-
-        if (!foundSitemapUrl) {
-          return { data: { urls: [], message: 'No sitemap was found for this site.' } };
-        }
-
-        sitemapUrl = foundSitemapUrl;
-        sitemapRes = await axios.get(sitemapUrl, { timeout: hardTimeOut });
-      } else {
-        throw error;
+    const robotsRes = await axios.get(`${targetUrl}/robots.txt`, axiosOpts);
+    if (typeof robotsRes.data === 'string') {
+      const robotsSitemaps = extractSitemapUrlsFromRobots(robotsRes.data);
+      for (const s of robotsSitemaps) {
+        candidates.push({ url: s, source: 'robots.txt' });
       }
     }
-
-    const parser = new xml2js.Parser();
-    const sitemap = await parser.parseStringPromise(sitemapRes.data);
-
-    return { data: sitemap as SitemapResult };
-  } catch (error) {
-    const err = error as any;
-    if (err.code === 'ECONNABORTED') {
-      return { error: `Request timed-out after ${hardTimeOut}ms`, errorCode: 'TIMEOUT', errorCategory: 'site' };
-    }
-    return { error: (error as Error).message };
+  } catch {
+    // robots.txt not available — that's fine
   }
+
+  // 2. Add common paths as fallback (only if not already in candidates)
+  const commonPaths = [`${targetUrl}/sitemap.xml`, `${targetUrl}/sitemap_index.xml`];
+  for (const p of commonPaths) {
+    if (!candidates.some((c) => c.url === p)) {
+      candidates.push({ url: p, source: 'direct' });
+    }
+  }
+
+  // 3. Try each candidate until one works
+  for (const candidate of candidates) {
+    try {
+      const res = await axios.get(candidate.url, axiosOpts);
+      if (res.status !== 200 || typeof res.data !== 'string') continue;
+
+      // Must look like XML
+      const trimmed = res.data.trim();
+      if (!trimmed.startsWith('<?xml') && !trimmed.startsWith('<')) continue;
+
+      const parser = new xml2js.Parser({ strict: false, normalizeTags: true });
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = await parser.parseStringPromise(res.data);
+      } catch {
+        continue; // Malformed XML — try next candidate
+      }
+
+      const type = detectType(parsed);
+      const urls = extractLocs(parsed);
+
+      return {
+        data: {
+          sitemapUrl: candidate.url,
+          source: candidate.source,
+          type,
+          urls,
+        },
+      };
+    } catch {
+      continue; // Network error — try next candidate
+    }
+  }
+
+  return { data: { sitemapUrl: '', source: 'direct', type: 'unknown', urls: [], message: 'No sitemap was found for this site.' } };
 };

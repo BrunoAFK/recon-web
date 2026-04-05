@@ -1,0 +1,155 @@
+---
+title: Network Checks
+description: "8 network checks: HTTP status, headers, cookies, ports, traceroute, and more"
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+recon-web runs 8 network checks that examine how the server responds to requests, what it exposes, and how traffic flows across the internet to reach it.
+
+---
+
+## HTTP Status
+
+**Handler:** `status`
+
+Checks the HTTP status code returned by the target URL and measures response time, including DNS lookup, TCP connect, and time to first byte (TTFB).
+
+**Why it matters:** The status code tells you whether the site is accessible. Response time directly affects user experience — pages that take more than 2 seconds to respond see significantly higher bounce rates.
+
+**Good result:** Status 200 (OK) with a fast response time (under 500ms TTFB).
+
+**Bad result:** 5xx errors (server failure), 4xx errors (broken URL), or response times consistently above 2 seconds.
+
+---
+
+## HTTP Headers
+
+**Handler:** `headers`
+
+Fetches all HTTP response headers from the target URL. Headers reveal server software, caching configuration, content encoding, CORS policy, and custom application headers.
+
+**Why it matters:** Response headers are a window into the server's configuration. They can leak software versions that help attackers target specific vulnerabilities, or they may be missing caching directives that hurt performance.
+
+**Good result:** No unnecessary version information exposed. Proper caching headers (`Cache-Control`, `ETag`) set. Content encoding (gzip/brotli) enabled.
+
+**Bad result:** `Server` header revealing exact software versions (e.g., `Apache/2.4.41`), `X-Powered-By` leaking framework versions (e.g., `PHP/7.2`), or missing cache headers causing poor performance.
+
+<Aside type="tip">
+  Review the headers for security-related entries as well, but see the [HTTP Security Headers](/recon-web/checks/security/#http-security-headers) check for a dedicated analysis of CSP, X-Frame-Options, and other security headers.
+</Aside>
+
+---
+
+## Cookies
+
+**Handler:** `cookies`
+
+Extracts all cookies set by the HTTP response and analyzes their security attributes:
+
+| Attribute | Purpose |
+|---|---|
+| `Secure` | Cookie only sent over HTTPS |
+| `HttpOnly` | Cookie inaccessible to JavaScript |
+| `SameSite` | Controls cross-site request behavior |
+| `Expires` / `Max-Age` | Cookie lifetime |
+| `Path` / `Domain` | Scope of the cookie |
+
+**Why it matters:** Cookies often carry session tokens and authentication data. Missing security flags expose users to session hijacking, cross-site request forgery (CSRF), and cross-site scripting (XSS) attacks.
+
+**Good result:** All session cookies have `Secure`, `HttpOnly`, and `SameSite=Strict` (or `Lax`) flags set.
+
+**Bad result:** Session cookies missing the `Secure` flag (sent over plain HTTP on public Wi-Fi), missing `HttpOnly` (XSS attacks can steal sessions via JavaScript), or missing `SameSite` (enables CSRF attacks and cross-site tracking).
+
+---
+
+## Redirects
+
+**Handler:** `redirects`
+
+Follows the complete HTTP redirect chain from the initial URL to the final destination. Records each hop with its status code (301, 302, 307, 308) and target URL.
+
+**Why it matters:** Redirect chains affect both performance and SEO. Long chains slow page load and waste search engine crawl budget. Using the wrong redirect type (302 temporary instead of 301 permanent) prevents link equity from passing through.
+
+**Good result:** A clean, single-hop redirect from HTTP to HTTPS (e.g., `http://example.com` -> 301 -> `https://example.com`). No unnecessary intermediate hops.
+
+**Bad result:** Long redirect chains (3+ hops), redirect loops (site becomes completely inaccessible), or 302 redirects used where 301 is appropriate (hurts SEO rankings).
+
+---
+
+## Open Ports
+
+**Handler:** `ports`
+
+Scans 33 common TCP ports on the target host, including:
+
+| Port | Service | Risk if exposed |
+|---|---|---|
+| 21 | FTP | Unencrypted file transfer, brute-force target |
+| 22 | SSH | Brute-force target if password auth is enabled |
+| 80 | HTTP | Expected for web servers |
+| 443 | HTTPS | Expected for web servers |
+| 3306 | MySQL | Direct database access from the internet |
+| 5432 | PostgreSQL | Direct database access from the internet |
+| 3389 | RDP | Remote desktop, common ransomware vector |
+| 8080 | HTTP alt | Development/proxy servers, often misconfigured |
+
+**Why it matters:** Every open port is a potential entry point for attackers. Database and remote administration ports should never be directly accessible from the public internet.
+
+**Good result:** Only expected ports open (typically 80 and 443 for a web server). All management and database ports are closed or firewalled.
+
+**Bad result:** Database ports (3306, 5432) open to the internet, SSH with password authentication, or unexpected ports that may indicate a compromised server running unauthorized services.
+
+<Aside type="caution">
+  Open database ports are a critical security risk. If MySQL (3306) or PostgreSQL (5432) is reachable from the internet, restrict access immediately using firewall rules or security groups.
+</Aside>
+
+---
+
+## IP Address
+
+**Handler:** `get-ip`
+
+Resolves the domain to its IP address(es). Shows the actual server IP, which may reveal the hosting provider, whether a CDN or proxy is in use, and if the site uses load balancing.
+
+**Why it matters:** Knowing the IP helps determine the hosting provider and infrastructure setup. IPs in Cloudflare or AWS ranges indicate CDN/proxy usage, meaning the real server IP is hidden. Multiple IPs suggest load balancing or geographic DNS routing.
+
+**Good result:** Domain resolves to one or more valid IP addresses. If a CDN is in use, the resolved IP belongs to the CDN provider (real server IP is protected).
+
+**Bad result:** Domain does not resolve (DNS failure), or the IP directly exposes the origin server when it should be behind a CDN.
+
+<Aside type="note">
+  This check is informational. The resolved IP is used as input for other checks such as Server Location, AbuseIPDB, and Traceroute.
+</Aside>
+
+---
+
+## Server Location
+
+**Handler:** `server-location`
+
+Determines the physical location of the server by performing a GeoIP lookup on the resolved IP address. Returns city, region, country, timezone, latitude/longitude, ISP, and autonomous system number (ASN). Results are displayed on an interactive map.
+
+**Why it matters:** Server location affects latency (a site serving European users from a US data center adds 100-200ms per request) and may have compliance implications. GDPR, for example, has specific requirements about where data is processed and stored.
+
+**Good result:** Server located in a region close to the target audience. Hosting provider is reputable with good uptime and DDoS protection.
+
+**Bad result:** Server in an unexpected country (potential compliance issue), or ISP/ASN associated with known bulletproof hosting providers.
+
+---
+
+## Traceroute
+
+**Handler:** `trace-route`
+
+Traces the network path from the recon-web server to the target host, recording each router hop along the way. Shows latency at each hop and identifies the networks traffic passes through.
+
+**Why it matters:** Traceroute helps diagnose slow connections by pinpointing which network hop introduces latency. It also reveals the geographic path of traffic, which may be relevant for data sovereignty requirements.
+
+**Good result:** Direct path with low latency at each hop. No packet loss at intermediate routers. Traffic stays within expected geographic regions.
+
+**Bad result:** High latency at a specific hop (network bottleneck), packet loss at intermediate hops (congestion or hardware issues), or traffic routing through unexpected countries.
+
+<Aside type="note">
+  Traceroute results depend on where the recon-web instance is running. Results will differ if you run from a local machine versus a cloud server in another region.
+</Aside>

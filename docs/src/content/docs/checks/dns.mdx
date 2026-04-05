@@ -1,0 +1,107 @@
+---
+title: DNS Checks
+description: "5 DNS checks: records, DNSSEC, provider, TXT, mail configuration"
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+recon-web runs 5 DNS checks that examine how the domain's DNS infrastructure is configured, whether it is cryptographically secured, and how email routing is set up.
+
+---
+
+## DNS Records
+
+**Handler:** `dns`
+
+Resolves all standard DNS record types for the domain:
+
+| Record type | Purpose |
+|---|---|
+| A | IPv4 address |
+| AAAA | IPv6 address |
+| MX | Mail server |
+| NS | Authoritative nameservers |
+| TXT | Verification, SPF, DKIM |
+| CNAME | Alias to another domain |
+| SOA | Start of Authority (zone metadata) |
+| SRV | Service discovery |
+| PTR | Reverse DNS |
+
+**Why it matters:** DNS records define how the domain's infrastructure works. Misconfigured MX records cause email delivery failures. Missing AAAA records mean no IPv6 support. TXT records reveal the email authentication setup.
+
+**Good result:** All expected record types resolve correctly. A and/or AAAA records point to the right servers. MX records are present if the domain handles email. NS records point to responsive nameservers.
+
+**Bad result:** Missing critical records. For example, missing MX records when the domain should receive email, or CNAME records that point to decommissioned hosts.
+
+---
+
+## DNS Provider
+
+**Handler:** `dns-server`
+
+Identifies the authoritative DNS server for the domain and checks whether it supports DNS over HTTPS (DoH). DoH encrypts DNS queries, preventing ISPs and network observers from seeing which sites users visit.
+
+**Why it matters:** The DNS provider is a single point of failure for your entire domain. If your nameservers go down, your website, email, and every other service become unreachable. Knowing the provider also helps assess infrastructure resilience.
+
+**Good result:** Authoritative DNS resolves correctly with DoH support available. Using a reputable DNS provider (Cloudflare, AWS Route 53, Google Cloud DNS, etc.) with anycast routing.
+
+**Bad result:** DNS server does not support DoH (user queries are visible to network observers), or the provider is a single-location server with no redundancy.
+
+<Aside type="note">
+  This check is informational. Not all DNS providers support DoH yet, and its absence is not a vulnerability — but it does mean DNS queries are transmitted in plaintext.
+</Aside>
+
+---
+
+## DNSSEC
+
+**Handler:** `dnssec`
+
+Checks DNSSEC (DNS Security Extensions) configuration by verifying the presence and validity of DNSKEY, DS, and RRSIG records. DNSSEC cryptographically signs DNS responses so clients can verify they have not been tampered with.
+
+**Why it matters:** Without DNSSEC, attackers can perform DNS cache poisoning — intercepting DNS responses and redirecting users to malicious servers. This is especially dangerous for banking, government, and healthcare sites.
+
+**Good result:** DNSSEC is fully configured. DNSKEY, DS, and RRSIG records are present with a valid signature chain.
+
+**Bad result:** DNSSEC is not configured (domain is vulnerable to DNS spoofing), or the chain is broken (misconfigured DS records can make the domain completely unreachable for validating resolvers).
+
+<Aside type="caution">
+  A broken DNSSEC chain is worse than no DNSSEC at all. If DS records are published but the zone is not signed correctly, validating resolvers like Cloudflare and Google will refuse to resolve the domain entirely.
+</Aside>
+
+---
+
+## TXT Records
+
+**Handler:** `txt-records`
+
+Retrieves and parses all TXT records for the domain. These commonly contain:
+
+- **SPF policies** — which servers are allowed to send email for the domain
+- **DKIM selectors** — public keys for email signature verification
+- **DMARC policies** — instructions for handling emails that fail SPF/DKIM
+- **Domain verification tokens** — Google, Microsoft, Facebook, and other service verifications
+
+**Why it matters:** TXT records are the foundation of email authentication. An SPF record without a strict `-all` qualifier allows anyone to send email pretending to be your domain. Verification tokens also reveal which third-party services the domain uses.
+
+**Good result:** SPF record present with a strict policy (`-all`). DKIM and DMARC records configured. No unnecessary verification tokens left from decommissioned services.
+
+**Bad result:** Missing SPF record (anyone can spoof email from this domain), overly permissive SPF with `+all` or `~all`, or no DMARC policy.
+
+---
+
+## Mail Configuration
+
+**Handler:** `mail-config`
+
+Analyzes MX records to determine the email provider and configuration. Identifies whether the domain uses a hosted email service (Google Workspace, Microsoft 365, Zoho, etc.) or self-hosted mail servers. Also checks for backup MX records.
+
+**Why it matters:** Email is critical business infrastructure. Misconfigured MX records cause bounced emails. Missing backup MX records mean a single mail server failure stops all incoming email.
+
+**Good result:** Valid MX records pointing to a reputable email provider, with backup MX configured. SPF and DMARC policies align with the mail provider's servers.
+
+**Bad result:** No MX records (the domain cannot receive email, which may be intentional or a misconfiguration), MX records pointing to non-responsive servers, or SPF/DMARC policies that do not match the configured mail provider.
+
+<Aside type="tip">
+  Knowing the mail provider is useful for phishing assessment. A bank or enterprise using a free email provider (Gmail, Outlook.com) instead of a business-grade service is a red flag.
+</Aside>

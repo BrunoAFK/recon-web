@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   MinusCircle,
   Search,
@@ -49,6 +49,96 @@ function stringifySearchableResult(result: HandlerResultData | undefined): strin
   }
 }
 
+/**
+ * DOM-aware masonry grid. Renders all items in a hidden single-column
+ * measurement container, reads their heights, then distributes them
+ * across columns using a shortest-column-first algorithm.
+ * Falls back to round-robin before measurements are available.
+ */
+function MasonryGrid<T extends { key: string }>({
+  items,
+  columnCount,
+  renderItem,
+}: {
+  items: T[];
+  columnCount: number;
+  renderItem: (item: T, index: number) => React.ReactNode;
+}) {
+  const cols = Math.max(1, columnCount);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const [distribution, setDistribution] = useState<number[][]>(() =>
+    buildRoundRobin(items.length, cols),
+  );
+
+  const itemKeys = items.map((i) => i.key).join(',');
+
+  // After items render in the measurement container, read heights and distribute
+  useLayoutEffect(() => {
+    if (cols <= 1) {
+      setDistribution([items.map((_, i) => i)]);
+      return;
+    }
+
+    const el = measureRef.current;
+    if (!el) {
+      setDistribution(buildRoundRobin(items.length, cols));
+      return;
+    }
+
+    const children = Array.from(el.children) as HTMLElement[];
+    if (children.length !== items.length) {
+      setDistribution(buildRoundRobin(items.length, cols));
+      return;
+    }
+
+    const GAP = 16;
+    const colHeights = new Array(cols).fill(0);
+    const newDist: number[][] = Array.from({ length: cols }, () => []);
+
+    for (let i = 0; i < items.length; i++) {
+      const shortest = colHeights.indexOf(Math.min(...colHeights));
+      newDist[shortest].push(i);
+      colHeights[shortest] += children[i].offsetHeight + GAP;
+    }
+
+    setDistribution(newDist);
+  }, [items.length, cols, itemKeys]);
+
+  return (
+    <>
+      {/* Hidden measurement container — single column, all items rendered */}
+      <div
+        ref={measureRef}
+        aria-hidden
+        className="fixed left-[-9999px] top-0"
+        style={{ width: `calc((100% - ${(cols - 1) * 16}px) / ${cols})`, visibility: 'hidden' }}
+      >
+        {items.map((item, i) => (
+          <div key={item.key}>{renderItem(item, i)}</div>
+        ))}
+      </div>
+
+      {/* Visible columns */}
+      <div className="flex gap-4">
+        {distribution.map((indices, colIdx) => (
+          <div key={colIdx} className="flex-1 min-w-0 space-y-4">
+            {indices.map((i) => {
+              const item = items[i];
+              return item ? <React.Fragment key={item.key}>{renderItem(item, i)}</React.Fragment> : null;
+            })}
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function buildRoundRobin(count: number, cols: number): number[][] {
+  const dist: number[][] = Array.from({ length: cols }, () => []);
+  for (let i = 0; i < count; i++) dist[i % cols].push(i);
+  return dist;
+}
+
 const CATEGORY_ORDER: HandlerCategory[] = [
   "security",
   "dns",
@@ -95,6 +185,18 @@ export default function ResultGrid({
   const [sortBy, setSortBy] = useState<SortBy>(getDefaultSortBy);
   const [statusOrder, setStatusOrder] = useState<StatusOrder>(getDefaultStatusOrder);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  // Track how many CSS columns are active based on viewport breakpoints
+  const [columnCount, setColumnCount] = useState(1);
+  useEffect(() => {
+    function update() {
+      const w = window.innerWidth;
+      setColumnCount(w >= 1280 ? 3 : w >= 768 ? 2 : 1);
+    }
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
 
   const { normalHandlers, skippedHandlers } = useMemo(() => {
     const normal: HandlerMetadata[] = [];
@@ -347,7 +449,7 @@ export default function ResultGrid({
           <div className="relative flex-1 min-w-[180px] max-w-xs">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
             <input
-              type="search"
+              type="text"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search"
@@ -372,26 +474,24 @@ export default function ResultGrid({
       </section>
 
       {groupBy === "none" ? (
-        <div className="columns-1 gap-4 md:columns-2 xl:columns-3">
-          {filteredNormalHandlers.map((handler) => {
-            const idx = animIndex++;
-            return (
-              <div key={handler.name} className="mb-4 break-inside-avoid">
-                <ResultCard
-                  name={handler.name}
-                  displayName={handler.displayName}
-                  category={handler.category}
-                  description={handler.description}
-                  shortDescription={handler.shortDescription}
-                  result={results[handler.name]}
-                  isLoading={isLoading && !results[handler.name]}
-                  animDelay={idx * 30}
-                  url={url}
-                />
-              </div>
-            );
-          })}
-        </div>
+        <MasonryGrid
+          items={filteredNormalHandlers.map((h) => ({ ...h, key: h.name }))}
+          columnCount={columnCount}
+          renderItem={(handler, idx) => (
+            <ResultCard
+              key={handler.name}
+              name={handler.name}
+              displayName={handler.displayName}
+              category={handler.category}
+              description={handler.description}
+              shortDescription={handler.shortDescription}
+              result={results[handler.name]}
+              isLoading={isLoading && !results[handler.name]}
+              animDelay={idx * 30}
+              url={url}
+            />
+          )}
+        />
       ) : (
         <GroupedCards
           handlers={filteredNormalHandlers}
@@ -411,6 +511,7 @@ export default function ResultGrid({
               return next;
             });
           }}
+          columnCount={columnCount}
         />
       )}
 
@@ -426,27 +527,25 @@ export default function ResultGrid({
             </h2>
             <span className="text-sm text-muted/40 tabular-nums">{filteredSkippedHandlers.length}</span>
           </div>
-          <div className="columns-1 gap-4 md:columns-2 xl:columns-3">
-            {filteredSkippedHandlers.map((handler) => {
-              const idx = animIndex++;
-              return (
-                <div key={handler.name} className="mb-4 break-inside-avoid">
-                  <ResultCard
-                    name={handler.name}
-                    displayName={handler.displayName}
-                    category={handler.category}
-                    description={handler.description}
-                    shortDescription={handler.shortDescription}
-                    result={results[handler.name]}
-                    isLoading={false}
-                    animDelay={idx * 30}
-                    variant="skipped"
-                    url={url}
-                  />
-                </div>
-              );
-            })}
-          </div>
+          <MasonryGrid
+            items={filteredSkippedHandlers.map((h) => ({ ...h, key: h.name }))}
+            columnCount={columnCount}
+            renderItem={(handler, idx) => (
+              <ResultCard
+                key={handler.name}
+                name={handler.name}
+                displayName={handler.displayName}
+                category={handler.category}
+                description={handler.description}
+                shortDescription={handler.shortDescription}
+                result={results[handler.name]}
+                isLoading={false}
+                animDelay={idx * 30}
+                variant="skipped"
+                url={url}
+              />
+            )}
+          />
         </section>
       )}
     </div>
@@ -569,6 +668,7 @@ function GroupedCards({
   animIndexRef,
   collapsedGroups,
   onToggleGroup,
+  columnCount,
 }: {
   handlers: HandlerMetadata[];
   results: Record<string, HandlerResultData>;
@@ -578,6 +678,7 @@ function GroupedCards({
   statusOrder: StatusOrder;
   getResultStatus: (r: HandlerResultData | undefined) => StatusFilter;
   animIndexRef: { current: number };
+  columnCount: number;
   collapsedGroups: Set<string>;
   onToggleGroup: (key: string) => void;
 }) {
@@ -630,26 +731,27 @@ function GroupedCards({
               <span className="text-sm text-muted tabular-nums">{items.length}</span>
             </button>
             {!isCollapsed && (
-              <div className="columns-1 gap-4 md:columns-2 xl:columns-3">
-                {items.map((handler) => {
-                  const idx = animIndexRef.current++;
+              <MasonryGrid
+                items={items.map((h) => ({ ...h, key: h.name }))}
+                columnCount={columnCount}
+                renderItem={(handler, idx) => {
+                  animIndexRef.current++;
                   return (
-                    <div key={handler.name} className="mb-4 break-inside-avoid">
-                      <ResultCard
-                        name={handler.name}
-                        displayName={handler.displayName}
-                        category={handler.category}
-                        description={handler.description}
-                        shortDescription={handler.shortDescription}
-                        result={results[handler.name]}
-                        isLoading={isLoading && !results[handler.name]}
-                        animDelay={idx * 30}
-                        url={url}
-                      />
-                    </div>
+                    <ResultCard
+                      key={handler.name}
+                      name={handler.name}
+                      displayName={handler.displayName}
+                      category={handler.category}
+                      description={handler.description}
+                      shortDescription={handler.shortDescription}
+                      result={results[handler.name]}
+                      isLoading={isLoading && !results[handler.name]}
+                      animDelay={idx * 30}
+                      url={url}
+                    />
                   );
-                })}
-              </div>
+                }}
+              />
             )}
           </section>
         );
