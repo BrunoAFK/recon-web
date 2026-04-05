@@ -1,16 +1,24 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { unlinkSync } from 'node:fs';
 import { buildServer } from './server.js';
 import type { FastifyInstance } from 'fastify';
 
 let server: FastifyInstance;
+const testDbPath = `/tmp/recon-web-server-test-${randomUUID()}.db`;
 
 beforeAll(async () => {
+  process.env.DB_PATH = testDbPath;
   server = await buildServer();
   await server.ready();
 });
 
 afterAll(async () => {
   await server.close();
+  try { unlinkSync(testDbPath); } catch {}
+  try { unlinkSync(testDbPath + '-wal'); } catch {}
+  try { unlinkSync(testDbPath + '-shm'); } catch {}
+  delete process.env.DB_PATH;
 });
 
 describe('API', () => {
