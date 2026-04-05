@@ -257,5 +257,3 @@ See the [development guide](docs/DEVELOPMENT.md) for architecture, running tests
 ## License
 
 [GPL-2.0-only](LICENSE) — free to use, modify, and distribute.
-
-Built by [Bruno Pavelja](https://pavelja.com).
