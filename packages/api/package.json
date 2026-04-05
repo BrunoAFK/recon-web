@@ -1,6 +1,6 @@
 {
   "name": "@recon-web/api",
-  "version": "0.9.1",
+  "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
