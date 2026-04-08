@@ -17,7 +17,8 @@ const CREATE_TABLES_SQL = `
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     handler_count INTEGER NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'running',
-    duration_ms INTEGER
+    duration_ms INTEGER,
+    user_id TEXT
   );
 
   CREATE TABLE IF NOT EXISTS scan_results (

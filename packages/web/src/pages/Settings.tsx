@@ -44,11 +44,6 @@ const apiKeysData: ApiKeyItem[] = [
   { label: "AbuseIPDB", envVar: "ABUSEIPDB_API_KEY", description: "IP reputation and abuse reports", freeLimit: "1,000 req/day", signupUrl: "https://www.abuseipdb.com/pricing", infoDate: "2025-04" },
 ];
 
-const authConfig: ConfigItem[] = [
-  { label: "Auth Enabled", envVar: "AUTH_ENABLED", description: "Whether API authentication is required" },
-  { label: "Auth Token", envVar: "AUTH_TOKEN", description: "Bearer token for API access" },
-];
-
 const GROUP_OPTIONS: { value: GroupBy; label: string; description: string }[] = [
   { value: "none", label: "No grouping", description: "Cards displayed in flat masonry layout" },
   { value: "category", label: "By Category", description: "Group cards by Security, DNS, Network, etc." },
@@ -198,8 +193,6 @@ export default function Settings() {
       </p>
 
       <div className="space-y-6">
-        <ConfigSection title="Authentication" items={authConfig} />
-
         {/* API Keys — rich display */}
         <div className="rounded-xl border border-border/50 bg-surface/50 p-6">
           <h2 className="text-lg font-semibold mb-4">API Keys (optional)</h2>

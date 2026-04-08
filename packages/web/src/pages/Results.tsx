@@ -60,6 +60,42 @@ export default function Results() {
   const completed = scan.progress.completed;
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
+  // Rate limit (429) — show a clean, human-friendly page
+  const errorMsg = scan.error instanceof Error ? scan.error.message : "";
+  const isRateLimited = scan.status === "failed" && errorMsg.includes("429");
+
+  if (isRateLimited) {
+    return (
+      <div className="mx-auto max-w-xl px-6 py-10">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-[14px] text-muted hover:text-foreground transition-colors mb-10"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Link>
+        <div className="flex flex-col items-center text-center animate-fade-in">
+          <div className="rounded-full bg-red-500/10 p-5 mb-6">
+            <AlertTriangle className="h-10 w-10 text-red-400" />
+          </div>
+          <h1
+            className="text-2xl font-bold tracking-tight mb-3"
+            style={{ fontFamily: "var(--font-display)" }}
+          >
+            Daily scan limit reached
+          </h1>
+          <p className="text-muted text-[15px] leading-relaxed mb-2 max-w-sm">
+            You've used all your scans for today.
+            The limit resets at midnight UTC.
+          </p>
+          <p className="text-muted/50 text-xs font-mono mt-4">
+            {decodedUrl} — HTTP 429
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // If stale, treat as failed
   if (staleTimeout && !scan.scanId) {
     return (

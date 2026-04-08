@@ -25,7 +25,8 @@ describe('executeScan', () => {
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         handler_count INTEGER NOT NULL DEFAULT 0,
         status TEXT NOT NULL DEFAULT 'running',
-        duration_ms INTEGER
+        duration_ms INTEGER,
+        user_id TEXT
       );
       CREATE TABLE scan_results (
         id TEXT PRIMARY KEY,

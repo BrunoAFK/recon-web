@@ -10,8 +10,6 @@ import {
   FileText,
   Database,
   Gauge,
-  BookOpen,
-  Github,
   Terminal,
   Copy,
   Check,
@@ -93,57 +91,33 @@ export default function Home() {
       </div>
 
       {/* Search form */}
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-xl mb-8 animate-fade-in"
-        style={{ animationDelay: "100ms" }}
-      >
-        <div className="relative flex items-center">
-          <Search className="absolute left-5 h-5 w-5 text-muted pointer-events-none" />
-          <input
-            type="text"
-            value={url}
-            onChange={(e) => {
-              setUrl(e.target.value);
-              if (error) setError("");
-            }}
-            placeholder="example.com"
-            className="w-full rounded-2xl border border-border bg-surface py-5 pl-14 pr-28 text-base text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
-            autoFocus
-          />
-          <button
-            type="submit"
-            className="absolute right-3 rounded-xl bg-accent px-6 py-3 text-[15px] font-semibold text-background hover:bg-accent-hover transition-colors"
-          >
-            Scan
-          </button>
-        </div>
-        {error && <p className="mt-3 text-[15px] text-danger pl-2">{error}</p>}
-      </form>
-
-      {/* Quick links */}
-      <div
-        className="flex items-center gap-4 mb-16 animate-fade-in"
-        style={{ animationDelay: "150ms" }}
-      >
-        <a
-          href="/docs"
-          className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground transition-colors"
-        >
-          <BookOpen className="h-4 w-4" />
-          API Docs
-        </a>
-        <span className="text-border">|</span>
-        <a
-          href="https://github.com/BrunoAFK/recon-web"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground transition-colors"
-        >
-          <Github className="h-4 w-4" />
-          GitHub
-        </a>
+      <div className="w-full max-w-xl mb-8 animate-fade-in" style={{ animationDelay: "100ms" }}>
+        <form onSubmit={handleSubmit}>
+          <div className="relative flex items-center">
+            <Search className="absolute left-5 h-5 w-5 text-muted pointer-events-none" />
+            <input
+              type="text"
+              value={url}
+              onChange={(e) => {
+                setUrl(e.target.value);
+                if (error) setError("");
+              }}
+              placeholder="example.com"
+              className="w-full rounded-2xl border border-border bg-surface py-5 pl-14 pr-28 text-base text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
+              autoFocus
+            />
+            <button
+              type="submit"
+              className="absolute right-3 rounded-xl bg-accent px-6 py-3 text-[15px] font-semibold text-background hover:bg-accent-hover transition-colors"
+            >
+              Scan
+            </button>
+          </div>
+          {error && <p className="mt-3 text-[15px] text-danger pl-2">{error}</p>}
+        </form>
       </div>
+
+      <div className="mb-16" />
 
       {/* Feature highlights */}
       <div

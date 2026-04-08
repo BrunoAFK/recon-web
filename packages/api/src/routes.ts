@@ -94,7 +94,7 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
       querystring: urlQuerySchema,
     },
     preHandler: validateUrlHook,
-  }, async (request) => {
+  }, async (request, reply) => {
     const { url } = request.query as { url: string };
     const apiKeys = getPopulatedApiKeys();
     const db = request.server.db;
@@ -175,8 +175,9 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async (request) => {
     const { limit, offset } = request.query as { limit?: number; offset?: number };
+    const search = (request.query as any).search as string | undefined;
     const db = request.server.db;
-    return getScans(db, { limit, offset });
+    return getScans(db, { limit, offset, search });
   });
 
   app.get('/api/history/:id', {
@@ -292,6 +293,34 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return reply.header('Content-Type', 'text/html; charset=utf-8').send(html);
+  });
+
+  // ── Demo endpoint ───────────────────────────────────────────────
+  app.get('/api/demo', {
+    schema: { description: 'Get latest demo scan result (public)', tags: ['demo'] },
+  }, async (request, reply) => {
+    const db = request.server.db;
+    const demoUrl = process.env.DEMO_SCAN_URL || config.demoScanUrl;
+    // Try both raw URL and normalized version (scan stores normalized URL)
+    let scan = db.prepare(
+      "SELECT * FROM scans WHERE user_id IS NULL AND url = ? ORDER BY created_at DESC LIMIT 1"
+    ).get(demoUrl) as any;
+    if (!scan) {
+      try {
+        const normalized = normalizeUrl(demoUrl);
+        scan = db.prepare(
+          "SELECT * FROM scans WHERE user_id IS NULL AND url = ? ORDER BY created_at DESC LIMIT 1"
+        ).get(normalized) as any;
+      } catch { /* invalid URL, skip */ }
+    }
+    if (!scan) {
+      // Fallback: just get the latest system scan (user_id IS NULL)
+      scan = db.prepare(
+        "SELECT * FROM scans WHERE user_id IS NULL ORDER BY created_at DESC LIMIT 1"
+      ).get() as any;
+    }
+    if (!scan) return reply.code(404).send({ error: 'No demo scan available yet' });
+    return getScan(db, scan.id);
   });
 
   // ── Per-handler routes ──────────────────────────────────────────

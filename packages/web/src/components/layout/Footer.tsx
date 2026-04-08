@@ -16,8 +16,12 @@ export default function Footer() {
 
           {/* Links */}
           <div className="flex items-center gap-5 text-xs">
-            <a href="/docs" className="hover:text-foreground transition-colors">
+            <a href="https://brunoafk.github.io/recon-web/" target="_blank" rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors">
               Docs
+            </a>
+            <a href="/docs" className="hover:text-foreground transition-colors">
+              API Docs
             </a>
             <a
               href="https://github.com/BrunoAFK/recon-web"

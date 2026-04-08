@@ -29,7 +29,13 @@ import type {
 function isEmptyData(data: unknown): boolean {
   if (data === null || data === undefined) return true;
   if (Array.isArray(data)) return data.length === 0;
-  if (typeof data === "object") return Object.keys(data as object).length === 0;
+  if (typeof data === "object") {
+    const obj = data as Record<string, unknown>;
+    const keys = Object.keys(obj);
+    if (keys.length === 0) return true;
+    // Check if all values are null/undefined/empty — e.g. { image: null }
+    return keys.every((k) => obj[k] === null || obj[k] === undefined || obj[k] === "");
+  }
   return false;
 }
 

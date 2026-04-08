@@ -16,10 +16,11 @@ export const qualityHandler: AnalysisHandler<QualityResult> = async (url, option
   }
 
   try {
+    const fullUrl = url.startsWith('http') ? url : `https://${url}`;
     const endpoint =
       `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?` +
-      `url=${encodeURIComponent(url)}&category=PERFORMANCE&category=ACCESSIBILITY` +
-      `&category=BEST_PRACTICES&category=SEO&category=PWA&strategy=mobile` +
+      `url=${encodeURIComponent(fullUrl)}&category=PERFORMANCE&category=ACCESSIBILITY` +
+      `&category=BEST-PRACTICES&category=SEO&strategy=mobile` +
       `&key=${apiKey}`;
 
     const response = await withRetry(
@@ -27,6 +28,15 @@ export const qualityHandler: AnalysisHandler<QualityResult> = async (url, option
     );
     return { data: response.data as QualityResult };
   } catch (error) {
+    const axiosErr = error as any;
+    if (axiosErr.response) {
+      const status = axiosErr.response.status;
+      const detail = axiosErr.response.data?.error;
+      const msg = detail
+        ? `${detail.message}${detail.status ? ` [${detail.status}]` : ''}${detail.errors?.length ? ` — ${detail.errors.map((e: any) => e.reason).join(', ')}` : ''}`
+        : JSON.stringify(axiosErr.response.data);
+      return { error: `PageSpeed API ${status}: ${msg}` };
+    }
     return { error: (error as Error).message };
   }
 };

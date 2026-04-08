@@ -3,6 +3,7 @@ import * as unzipper from 'unzipper';
 import csv from 'csv-parser';
 import fs from 'fs';
 import type { AnalysisHandler, HandlerResult } from '../types.js';
+import { normalizeUrl } from '../utils/url.js';
 
 const FILE_URL = 'https://s3-us-west-1.amazonaws.com/umbrella-static/top-1m.csv.zip';
 const TEMP_FILE_PATH = '/tmp/top-1m.csv';
@@ -17,7 +18,8 @@ export interface LegacyRankResult {
 export const legacyRankHandler: AnalysisHandler<LegacyRankResult> = async (url, options) => {
   let domain: string;
   try {
-    domain = new URL(url).hostname;
+    const targetUrl = normalizeUrl(url);
+    domain = new URL(targetUrl).hostname;
   } catch {
     return { error: 'Invalid URL', errorCode: 'INVALID_URL', errorCategory: 'tool' };
   }

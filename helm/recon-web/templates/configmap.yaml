@@ -10,7 +10,22 @@ data:
   HOST: "0.0.0.0"
   PORT: "3000"
   MAX_CONCURRENCY: {{ .Values.api.env.MAX_CONCURRENCY | default "8" | quote }}
-  AUTH_ENABLED: {{ .Values.auth.enabled | quote }}
+  MAX_CONCURRENT_SCANS: {{ .Values.auth.maxConcurrentScans | default 3 | quote }}
+  {{- if .Values.auth.provider }}
+  AUTH_PROVIDER: {{ .Values.auth.provider | quote }}
+  REGISTRATION_OPEN: {{ .Values.auth.registrationOpen | quote }}
+  APP_URL: {{ .Values.auth.appUrl | quote }}
+  DAILY_SCAN_LIMIT_GLOBAL: {{ .Values.auth.scanLimits.global | default 0 | quote }}
+  DAILY_SCAN_LIMIT_USER: {{ .Values.auth.scanLimits.user | default 0 | quote }}
+  SUPERADMIN_VIEW_EMAIL: {{ .Values.auth.superadminView.email | default true | quote }}
+  SUPERADMIN_VIEW_LAST_LOGIN: {{ .Values.auth.superadminView.lastLogin | default true | quote }}
+  SUPERADMIN_VIEW_DAILY_SCANS: {{ .Values.auth.superadminView.dailyScans | default true | quote }}
+  SUPERADMIN_VIEW_SCANNED_PAGES: {{ .Values.auth.superadminView.scannedPages | default true | quote }}
+  DEMO_SCAN_URL: {{ .Values.auth.demoScanUrl | default "https://example.com" | quote }}
+  {{- if .Values.auth.firebase.projectId }}
+  FIREBASE_PROJECT_ID: {{ .Values.auth.firebase.projectId | quote }}
+  {{- end }}
+  {{- end }}
   {{- if .Values.scanner.enabled }}
   SCHEDULE_ENABLED: "true"
   SCHEDULE_CRON: {{ .Values.scanner.schedule | quote }}

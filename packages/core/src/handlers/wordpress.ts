@@ -45,7 +45,6 @@ async function fetchText(url: string, timeout: number): Promise<string | null> {
     });
     if (!res.ok) return null;
     const ct = res.headers.get('content-type') ?? '';
-    // Only read text-like responses
     if (!ct.includes('text') && !ct.includes('json') && !ct.includes('xml')) return null;
     return await res.text();
   } catch {
@@ -53,14 +52,98 @@ async function fetchText(url: string, timeout: number): Promise<string | null> {
   }
 }
 
-async function isAccessible(url: string, timeout: number): Promise<boolean> {
+/**
+ * Detect if the server has a catch-all (returns 200 for any path).
+ * Probe a random nonsensical path — if it returns 200, the server
+ * has a catch-all and we cannot trust status codes for file checks.
+ */
+async function hasCatchAll(base: string, timeout: number): Promise<boolean> {
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`${base}/wp-content/recon-web-probe-${Date.now()}.php`, {
       method: 'HEAD',
       redirect: 'follow',
       signal: AbortSignal.timeout(timeout),
     });
     return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if a WordPress-specific path is genuinely accessible.
+ *
+ * When the server has a catch-all (returns 200 for everything),
+ * we require content-based proof for every path. When there's no
+ * catch-all, a 200 status with correct content-type is sufficient.
+ */
+async function isAccessible(
+  url: string,
+  path: string,
+  timeout: number,
+  catchAll: boolean,
+): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(timeout),
+      headers: { 'User-Agent': 'recon-web/1.0' },
+    });
+    if (!res.ok) return false;
+
+    const ct = res.headers.get('content-type') ?? '';
+
+    if (path === 'wp-login.php') {
+      if (!ct.includes('text/html')) return false;
+      const body = await res.text();
+      // Real wp-login has a specific login form
+      return /loginform|user_login|wp-submit/i.test(body);
+    }
+
+    if (path === 'xmlrpc.php') {
+      const body = await res.text();
+      // Real xmlrpc.php responds with "XML-RPC server accepts POST requests only"
+      // or an XML fault response
+      return /XML-RPC server|<methodResponse>/i.test(body) || (ct.includes('xml') && !ct.includes('html'));
+    }
+
+    if (path === 'wp-json/wp/v2/users') {
+      if (!ct.includes('json')) return false;
+      const body = await res.text();
+      // Real WP users endpoint returns a JSON array with user objects containing "slug"
+      return body.startsWith('[') && /\"slug\"/.test(body);
+    }
+
+    if (path === 'readme.html') {
+      const body = await res.text();
+      // Real WP readme.html has a very specific structure
+      return /wordpress\.org|WordPress\s+[\d.]+/i.test(body) && /<h1/i.test(body);
+    }
+
+    if (path === 'wp-content/debug.log') {
+      // Debug log must be plain text, never HTML
+      if (ct.includes('text/html')) return false;
+      if (catchAll) return false; // Can't verify plain text content reliably
+      return true;
+    }
+
+    if (path === 'wp-admin/install.php') {
+      if (!ct.includes('text/html')) return false;
+      const body = await res.text();
+      // Real WP install.php has very specific form content
+      return /setup-config\.php|install\.css|language-chooser|wp-setup-config/i.test(body);
+    }
+
+    if (path === 'wp-config.php.bak' || path === '.wp-config.php.swp') {
+      // Must not be HTML — real config backup contains PHP source
+      if (ct.includes('text/html')) return false;
+      const body = await res.text();
+      return /DB_NAME|DB_PASSWORD|AUTH_KEY|SECURE_AUTH_KEY/i.test(body);
+    }
+
+    // Unknown path — if server has catch-all, don't trust the 200
+    if (catchAll) return false;
+    return true;
   } catch {
     return false;
   }
@@ -95,15 +178,12 @@ function extractThemes(html: string): WpTheme[] {
 }
 
 function extractWpVersion(html: string): string | null {
-  // meta generator tag
   const genMatch = html.match(/<meta[^>]+name=["']generator["'][^>]+content=["']WordPress\s+([0-9.]+)["']/i);
   if (genMatch) return genMatch[1];
 
-  // wp-emoji script version
   const emojiMatch = html.match(/wp-emoji-release\.min\.js\?ver=([0-9.]+)/);
   if (emojiMatch) return emojiMatch[1];
 
-  // wp-includes version hints
   const includesMatch = html.match(/wp-includes\/[^"']+\?ver=([0-9.]+)/);
   if (includesMatch) return includesMatch[1];
 
@@ -115,32 +195,33 @@ export const wordpressHandler: AnalysisHandler<WordPressResult> = async (url, op
   const normalized = normalizeUrl(url);
   const base = normalized.replace(/\/+$/, '');
 
-  // Fetch homepage HTML
   const html = await fetchText(base, timeout);
 
   if (!html) {
-    return { data: { isWordPress: false, version: null, plugins: [], themes: [], exposedFiles: [], issues: [] } };
+    return { error: 'WordPress not detected on this site.', errorCategory: 'info' };
   }
 
-  // Detect WordPress
+  // Detect WordPress from homepage content
   const hasWpContent = /wp-content\//i.test(html);
   const hasWpIncludes = /wp-includes\//i.test(html);
-  const hasGenerator = /WordPress/i.test(html);
+  const hasGenerator = /<meta[^>]+name=["']generator["'][^>]+WordPress/i.test(html);
 
   if (!hasWpContent && !hasWpIncludes && !hasGenerator) {
-    return { data: { isWordPress: false, version: null, plugins: [], themes: [], exposedFiles: [], issues: [] } };
+    return { error: 'WordPress not detected on this site.', errorCategory: 'info' };
   }
 
-  // Extract data
   const version = extractWpVersion(html);
   const plugins = extractPlugins(html);
   const themes = extractThemes(html);
+
+  // Detect catch-all before checking exposed files
+  const catchAll = await hasCatchAll(base, timeout);
 
   // Check exposed files in parallel
   const exposedChecks = await Promise.all(
     EXPOSED_PATHS.map(async (path) => ({
       path,
-      accessible: await isAccessible(`${base}/${path}`, timeout),
+      accessible: await isAccessible(`${base}/${path}`, path, timeout, catchAll),
     })),
   );
   const exposedFiles = exposedChecks.filter((f) => f.accessible);

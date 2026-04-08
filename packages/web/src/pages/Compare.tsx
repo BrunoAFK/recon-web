@@ -305,7 +305,7 @@ export default function Compare() {
                           <tbody>
                             {diff.fields.map((f, i) => (
                               <tr key={i} className="border-b border-border/20 last:border-0">
-                                <td className="px-3 py-2 text-muted font-medium">{f.field}</td>
+                                <td className="px-3 py-2 text-muted font-medium break-all">{f.field}</td>
                                 <td className="px-3 py-2 text-red-300/80 break-all">
                                   <pre className="whitespace-pre-wrap text-xs max-h-32 overflow-auto">
                                     {stringify(f.oldValue)}
@@ -325,7 +325,7 @@ export default function Compare() {
                         <div className="sm:hidden divide-y divide-border/20">
                           {diff.fields.map((f, i) => (
                             <div key={i} className="p-3 space-y-2">
-                              <p className="text-xs font-medium text-muted uppercase tracking-wider">{f.field}</p>
+                              <p className="text-xs font-medium text-muted uppercase tracking-wider break-all">{f.field}</p>
                               <div className="space-y-1.5">
                                 <div>
                                   <span className="text-[10px] text-muted uppercase">A: </span>

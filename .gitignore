@@ -40,6 +40,9 @@ Thumbs.db
 @internal/
 docs/superpowers/
 
+# Infrastructure
+infra/
+
 # SQLite databases
 *.db
 *.db-journal

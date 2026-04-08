@@ -134,7 +134,7 @@ export const screenshotHandler: AnalysisHandler<ScreenshotResult> = async (url, 
       );
       return { data: { image: base64Screenshot } };
     } catch {
-      return { error: (error as Error).message };
+      return { error: `Screenshot unavailable: ${(error as Error).message}`, errorCategory: 'tool' };
     }
   } finally {
     if (browser !== null) {
