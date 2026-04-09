@@ -8,10 +8,10 @@ import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
 import fastifyStatic from '@fastify/static';
 import type BetterSqlite3 from 'better-sqlite3';
+import type { FastifyInstance } from 'fastify';
 import { config } from './config.js';
 import { registerRoutes } from './routes.js';
 import { initDb } from './db/index.js';
-import { authPlugin } from './auth/index.js';
 import { schedulerPlugin } from './scheduler/index.js';
 
 declare module 'fastify' {
@@ -20,9 +20,18 @@ declare module 'fastify' {
   }
 }
 
+export interface BuildServerOptions {
+  /** Additional Fastify plugins to register before routes (e.g. auth) */
+  plugins?: Array<(app: FastifyInstance) => Promise<void>>;
+  /** Additional route registrations to run after core routes */
+  routes?: Array<(app: FastifyInstance) => Promise<void>>;
+  /** Override the static files directory */
+  staticDir?: string;
+}
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export async function buildServer() {
+export async function buildServer(opts?: BuildServerOptions) {
   const app = Fastify({
     logger: true,
   });
@@ -33,28 +42,32 @@ export async function buildServer() {
   });
 
   await app.register(rateLimit, {
-    max: 100,
-    timeWindow: '10 minutes',
+    max: parseInt(process.env.RATE_LIMIT_MAX || '', 10) || 100,
+    timeWindow: process.env.RATE_LIMIT_WINDOW || '10 minutes',
   });
 
-  await app.register(swagger, {
-    openapi: {
-      info: {
-        title: 'recon-web API',
-        description: 'REST API for running web reconnaissance and analysis handlers against any URL.',
-        version: '1.0.0',
+  if (process.env.SWAGGER_ENABLED === 'true') {
+    await app.register(swagger, {
+      openapi: {
+        info: {
+          title: 'recon-web API',
+          description: 'REST API for running web reconnaissance and analysis handlers against any URL.',
+          version: '1.0.0',
+        },
       },
-    },
-  });
+    });
 
-  await app.register(swaggerUi, {
-    routePrefix: '/docs',
-  });
+    await app.register(swaggerUi, {
+      routePrefix: '/docs',
+    });
+  }
 
   // ── Static files (serve built frontend if available) ────────────
-  const staticDir = config.staticDir
-    ? resolve(config.staticDir)
-    : resolve(process.cwd(), 'packages', 'web', 'dist');
+  const staticDir = opts?.staticDir
+    ? resolve(opts.staticDir)
+    : config.staticDir
+      ? resolve(config.staticDir)
+      : resolve(process.cwd(), 'packages', 'web', 'dist');
 
   if (existsSync(staticDir)) {
     await app.register(fastifyStatic, {
@@ -66,15 +79,26 @@ export async function buildServer() {
   }
 
   // ── Database ────────────────────────────────────────────────────
-  const db = initDb(config.dbPath);
+  const db = initDb(process.env.DB_PATH || config.dbPath);
   app.decorate('db', db);
   app.addHook('onClose', () => db.close());
 
-  // ── Auth ───────────────────────────────────────────────────────
-  await app.register(authPlugin);
+  // ── External plugins (e.g. auth) ───────────────────────────────
+  if (opts?.plugins) {
+    for (const plugin of opts.plugins) {
+      await plugin(app);
+    }
+  }
 
   // ── Routes ──────────────────────────────────────────────────────
   await registerRoutes(app);
+
+  // ── External routes (e.g. auth routes, admin routes) ──────────
+  if (opts?.routes) {
+    for (const route of opts.routes) {
+      await route(app);
+    }
+  }
 
   // ── Scheduler ─────────────────────────────────────────────────
   await app.register(schedulerPlugin);

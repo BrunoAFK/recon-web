@@ -13,6 +13,19 @@ function detectChromePath(): string | undefined {
   return candidates.find((p) => existsSync(p));
 }
 
+export function envBool(key: string, defaultValue: boolean): boolean {
+  const val = process.env[key];
+  if (val === undefined || val === '') return defaultValue;
+  return val.toLowerCase() !== 'false' && val !== '0';
+}
+
+export function envInt(key: string, defaultValue: number): number {
+  const val = process.env[key];
+  if (val === undefined || val === '') return defaultValue;
+  const parsed = parseInt(val, 10);
+  return isNaN(parsed) ? defaultValue : parsed;
+}
+
 export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
   host: process.env.HOST || '0.0.0.0',
@@ -21,7 +34,11 @@ export const config = {
   chromePath: detectChromePath(),
   staticDir: process.env.STATIC_DIR || undefined,
   maxConcurrency: parseInt(process.env.MAX_CONCURRENCY || '8', 10),
+  maxConcurrentScans: envInt('MAX_CONCURRENT_SCANS', 3),
   dbPath: process.env.DB_PATH || './data/recon-web.db',
+
+  // Demo
+  demoScanUrl: process.env.DEMO_SCAN_URL || 'https://example.com',
 
   apiKeys: {
     GOOGLE_CLOUD_API_KEY: process.env.GOOGLE_CLOUD_API_KEY || '',

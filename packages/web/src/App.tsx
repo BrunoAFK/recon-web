@@ -5,34 +5,31 @@ import Home from "@/pages/Home";
 import Results from "@/pages/Results";
 import HistoryResults from "@/pages/HistoryResults";
 import History from "@/pages/History";
-import Login from "@/pages/Login";
+import Demo from "@/pages/Demo";
 import Settings from "@/pages/Settings";
 import Compare from "@/pages/Compare";
 import NotFound from "@/pages/NotFound";
-import { AuthProvider } from "@/hooks/use-auth";
 import { ThemeProvider } from "@/hooks/use-theme";
 
 export default function App() {
   return (
     <ThemeProvider>
-    <AuthProvider>
-      <div className="min-h-screen bg-background text-foreground">
+      <div className="min-h-screen bg-background text-foreground flex flex-col">
         <Nav />
-        <main>
+        <main className="flex-1">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/results/:url" element={<Results />} />
             <Route path="/history" element={<History />} />
             <Route path="/history/:scanId" element={<HistoryResults />} />
             <Route path="/compare/:id1/:id2" element={<Compare />} />
-            <Route path="/login" element={<Login />} />
+            <Route path="/demo" element={<Demo />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
         <Footer />
       </div>
-    </AuthProvider>
     </ThemeProvider>
   );
 }

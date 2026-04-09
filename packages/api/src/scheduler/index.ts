@@ -2,8 +2,49 @@ import type { FastifyInstance } from 'fastify';
 import fp from 'fastify-plugin';
 import cron from 'node-cron';
 import { executeScan } from '../scan.js';
+import { config } from '../config.js';
 import { detectChanges } from '@recon-web/core';
 import { buildNotificationConfig, sendNotification } from '../notifications/index.js';
+
+async function runDemoScan(app: FastifyInstance): Promise<void> {
+  const demoUrl = process.env.DEMO_SCAN_URL || config.demoScanUrl;
+  if (!demoUrl) return;
+
+  app.log.info(`Running demo scan for ${demoUrl}`);
+  try {
+    await executeScan({
+      db: app.db,
+      url: demoUrl,
+      handlerOptions: { timeout: 30_000 },
+      concurrency: 4,
+    });
+    app.log.info('Demo scan completed');
+  } catch (err) {
+    app.log.error(`Demo scan failed: ${String(err)}`);
+  }
+}
+
+async function setupDemoScan(app: FastifyInstance): Promise<void> {
+  const demoUrl = process.env.DEMO_SCAN_URL || config.demoScanUrl;
+  if (!demoUrl) return;
+
+  // Run immediately if no demo scan exists yet
+  const existing = app.db.prepare(
+    "SELECT id FROM scans WHERE user_id IS NULL AND url = ? LIMIT 1",
+  ).get(demoUrl);
+
+  if (!existing) {
+    app.log.info('No demo scan found — running initial demo scan');
+    // Run in background so it doesn't block server startup
+    runDemoScan(app).catch(() => {});
+  }
+
+  // Schedule daily refresh at 00:30 UTC
+  app.log.info(`Demo scan scheduled daily for ${demoUrl}`);
+  cron.schedule('30 0 * * *', () => {
+    runDemoScan(app).catch(() => {});
+  });
+}
 
 async function schedulerPluginImpl(app: FastifyInstance): Promise<void> {
   const enabled = process.env.SCHEDULE_ENABLED === 'true';
@@ -12,6 +53,7 @@ async function schedulerPluginImpl(app: FastifyInstance): Promise<void> {
 
   if (!enabled) {
     app.log.info('Scheduler plugin loaded but SCHEDULE_ENABLED is not true — skipping');
+    await setupDemoScan(app);
     return;
   }
 
@@ -22,11 +64,13 @@ async function schedulerPluginImpl(app: FastifyInstance): Promise<void> {
 
   if (urls.length === 0) {
     app.log.warn('Scheduler enabled but SCHEDULE_URLS is empty — nothing to scan');
+    await setupDemoScan(app);
     return;
   }
 
   if (!cron.validate(cronExpr)) {
     app.log.error(`Invalid cron expression: ${cronExpr}`);
+    await setupDemoScan(app);
     return;
   }
 
@@ -89,6 +133,8 @@ async function schedulerPluginImpl(app: FastifyInstance): Promise<void> {
     task.stop();
     app.log.info('Scheduler stopped');
   });
+
+  await setupDemoScan(app);
 }
 
 export const schedulerPlugin = fp(schedulerPluginImpl, {

@@ -39,6 +39,8 @@ services:
   cli:
     image: ${REGISTRY:-ghcr.io/brunoafk/recon-web}/cli:${TAG:-latest}
     env_file: .env
+    volumes:
+      - scan-data:/app/data
     profiles: ["cli"]
 
 volumes:

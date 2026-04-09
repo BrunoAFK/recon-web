@@ -13,13 +13,17 @@
   },
   "dependencies": {
     "@recon-web/core": "*",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.8.0",
     "commander": "^12.1.0",
-    "picocolors": "^1.1.0",
-    "ora": "^8.1.0"
+    "ora": "^8.1.0",
+    "picocolors": "^1.1.0"
   },
   "devDependencies": {
-    "typescript": "^5.6.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   }
 }

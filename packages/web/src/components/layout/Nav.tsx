@@ -1,14 +1,19 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Globe, Github, Settings, Clock, Palette, Check } from "lucide-react";
+import { Globe, Clock, Palette, Check, Settings } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 
-export default function Nav() {
+interface NavProps {
+  /** Optional slot for user menu (e.g. auth dropdown). If omitted, shows simple settings link. */
+  userMenu?: React.ReactNode;
+}
+
+export default function Nav({ userMenu }: NavProps = {}) {
   const [showThemes, setShowThemes] = useState(false);
   const { theme, setTheme, themes } = useTheme();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on click outside
+  // Close theme dropdown on click outside
   useEffect(() => {
     if (!showThemes) return;
     const handleClick = (e: MouseEvent) => {
@@ -95,15 +100,8 @@ export default function Nav() {
             )}
           </div>
 
-          <a
-            href="https://github.com/BrunoAFK/recon-web"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted hover:text-foreground hover:bg-surface-light/50 transition-colors"
-            aria-label="GitHub"
-          >
-            <Github className="h-4 w-4" />
-          </a>
+          {/* User menu slot — pro injects auth dropdown here */}
+          {userMenu}
         </div>
       </div>
     </nav>

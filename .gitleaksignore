@@ -1,0 +1,7 @@
+3ba15210b191e8a325df35f9256b5c5c9d89ac05:@internal/AUTH-SETUP.md:curl-auth-header:85
+3ba15210b191e8a325df35f9256b5c5c9d89ac05:@internal/AUTH-SETUP.md:curl-auth-header:384
+abf03987e2574d92614c2af2717e69908552fff0:packages/api/src/auth/auth.test.ts:generic-api-key:60
+abf03987e2574d92614c2af2717e69908552fff0:packages/api/src/auth/auth.test.ts:generic-api-key:159
+346dd51d2d32252ab1710b30cab1000fb77e7728:docs/src/content/docs/guides/rest-api.mdx:curl-auth-header:122
+7bd2fa7b6e03b148493382b5b2ba84ab95eb9420:docs/src/content/docs/guides/rest-api.mdx:curl-auth-header:122
+a8393590d20499515efeb13d2b5bcb0b80be1b7a:docs/superpowers/plans/2026-04-07-user-authentication.md:generic-api-key:3143

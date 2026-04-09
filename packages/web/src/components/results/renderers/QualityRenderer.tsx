@@ -26,16 +26,14 @@ export function QualityRenderer({ data }: RendererProps) {
   }
 
   return (
-    <div className="flex flex-wrap gap-4">
+    <div className="space-y-2">
       {Object.values(cats).map((cat) => {
         const score = Math.round((cat.score ?? 0) * 100);
         return (
-          <div key={cat.title} className="flex flex-col items-center gap-0.5">
-            <span className={`text-xl font-bold ${scoreColor(score)}`}>
+          <div key={cat.title} className="flex items-center justify-between py-1.5 border-b border-border/20 last:border-0">
+            <span className="text-sm text-muted">{cat.title}</span>
+            <span className={`text-lg font-bold tabular-nums ${scoreColor(score)}`}>
               {score}
-            </span>
-            <span className="text-sm text-muted text-center leading-tight max-w-[70px]">
-              {cat.title}
             </span>
           </div>
         );

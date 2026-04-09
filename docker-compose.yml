@@ -36,6 +36,8 @@ services:
       context: .
       dockerfile: packages/cli/Dockerfile
     env_file: .env
+    volumes:
+      - scan-data:/app/data
     profiles: ["cli"]
 
 volumes:

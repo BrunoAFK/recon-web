@@ -70,6 +70,7 @@ interface ExecuteScanOptions {
   handlers?: string[];
   onEvent?: (event: ScanEvent) => void | Promise<void>;
   signal?: AbortSignal;
+  userId?: string;
 }
 
 function buildProgress(progress: ScanProgressSnapshot): ScanProgressSnapshot {
@@ -162,6 +163,7 @@ export async function executeScan({
   handlers,
   onEvent,
   signal,
+  userId,
 }: ExecuteScanOptions): Promise<{ scanId: string; results: Record<string, HandlerResult>; durationMs: number }> {
   // Pre-flight reachability check (skip when running a targeted subset of handlers)
   if (!handlers) {
@@ -174,7 +176,7 @@ export async function executeScan({
     ? allNames.filter((name: string) => name !== 'screenshot').concat('screenshot')
     : [...allNames];
 
-  const scanId = createScan(db, { url, handlerCount: orderedHandlers.length });
+  const scanId = createScan(db, { url, handlerCount: orderedHandlers.length, userId });
   const startedAt = Date.now();
   const progress: ScanProgressSnapshot = {
     total: orderedHandlers.length,
@@ -277,14 +279,32 @@ export async function executeScan({
   }
 }
 
-// ── In-flight scan deduplication ─────────────────────────────────────
+// ── Global concurrent scan limiter ───────────────────────────────────
+import { config } from './config.js';
+
 type ScanResult = { scanId: string; results: Record<string, HandlerResult>; durationMs: number };
+
+const globalScanLimit = pLimit(
+  parseInt(process.env.MAX_CONCURRENT_SCANS || '', 10) || config.maxConcurrentScans || 3,
+);
+
+/** Number of scans currently running or queued. */
+export function getScanQueueStatus(): { active: number; pending: number; limit: number } {
+  return {
+    active: globalScanLimit.activeCount,
+    pending: globalScanLimit.pendingCount,
+    limit: parseInt(process.env.MAX_CONCURRENT_SCANS || '', 10) || config.maxConcurrentScans || 3,
+  };
+}
+
+// ── In-flight scan deduplication ─────────────────────────────────────
 const inFlightScans = new Map<string, Promise<ScanResult>>();
 
 /**
- * Wraps executeScan with in-flight deduplication.
- * If a scan for the same URL is already running, reuses its Promise
- * instead of starting a duplicate scan.
+ * Wraps executeScan with in-flight deduplication and global concurrency limit.
+ * - If a scan for the same URL is already running, reuses its Promise.
+ * - Otherwise, queues the scan through the global limiter so at most
+ *   MAX_CONCURRENT_SCANS scans run simultaneously.
  */
 export async function executeScanDeduped(
   opts: ExecuteScanOptions,
@@ -293,7 +313,7 @@ export async function executeScanDeduped(
   const existing = inFlightScans.get(key);
   if (existing) return existing;
 
-  const promise = executeScan(opts).finally(() => inFlightScans.delete(key));
+  const promise = globalScanLimit(() => executeScan(opts)).finally(() => inFlightScans.delete(key));
   inFlightScans.set(key, promise);
   return promise;
 }

@@ -85,32 +85,24 @@ export type ScanStreamEvent =
   | ScanCompletedEvent
   | ScanFailedEvent;
 
-function getStoredToken(): string | null {
-  try {
-    return localStorage.getItem("recon-web-token");
-  } catch {
-    return null;
-  }
-}
-
 function buildHeaders(extra?: HeadersInit): Headers {
   const headers = new Headers(extra);
   if (!headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-
-  const token = getStoredToken();
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-
   return headers;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = buildHeaders(init?.headers);
+  // Don't send Content-Type on requests without a body (GET, DELETE)
+  const method = init?.method?.toUpperCase() ?? 'GET';
+  if (!init?.body && (method === 'GET' || method === 'DELETE')) {
+    headers.delete("Content-Type");
+  }
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
-    headers: buildHeaders(init?.headers),
+    headers,
   });
 
   if (!res.ok) {
@@ -171,10 +163,12 @@ export interface HistoryScanListItem {
   handler_count: number;
   status: string;
   duration_ms: number | null;
+  user_id?: string | null;
+  result_summary?: { ok: number; issues: number; info: number; skipped: number };
 }
 
-export function getHistory(limit = 50, offset = 0): Promise<HistoryScanListItem[]> {
-  return request<HistoryScanListItem[]>(`/history?limit=${limit}&offset=${offset}`);
+export function getHistory(limit = 50, offset = 0, search = ''): Promise<HistoryScanListItem[]> {
+  return request<HistoryScanListItem[]>(`/history?limit=${limit}&offset=${offset}${search ? `&search=${encodeURIComponent(search)}` : ''}`);
 }
 
 export function deleteHistoryScan(scanId: string): Promise<{ success: true }> {
@@ -183,11 +177,7 @@ export function deleteHistoryScan(scanId: string): Promise<{ success: true }> {
 
 /** Download or open a scan report. Tries PDF first, falls back to HTML in new tab. */
 export async function downloadReport(scanId: string): Promise<void> {
-  const headers = new Headers();
-  const token = getStoredToken();
-  if (token) headers.set('Authorization', `Bearer ${token}`);
-
-  const res = await fetch(`${BASE_URL}/history/${scanId}/report?format=pdf`, { headers });
+  const res = await fetch(`${BASE_URL}/history/${scanId}/report?format=pdf`);
 
   if (!res.ok) {
     // Fall back to HTML in new tab
@@ -277,4 +267,9 @@ export async function streamScan(
       opts.onEvent(event);
     }
   }
+}
+
+// ── Demo ────────────────────────────────────────────────────────────
+export function getDemoScan(): Promise<HistoricalScan> {
+  return request<HistoricalScan>('/demo');
 }
