@@ -1,6 +1,7 @@
-import axios from 'axios';
 import type { AnalysisHandler, HandlerResult } from '../types.js';
 import { normalizeUrl } from '../utils/url.js';
+import { safeFetch } from '../utils/safe-fetch.js';
+import { SsrfBlockedError } from '../utils/network.js';
 
 interface RobotsRule {
   lbl: string;
@@ -45,7 +46,7 @@ export const robotsTxtHandler: AnalysisHandler<RobotsTxtResult> = async (url, op
   const robotsURL = `${parsedURL.protocol}//${parsedURL.hostname}/robots.txt`;
 
   try {
-    const response = await axios.get(robotsURL, { timeout: options?.timeout });
+    const response = await safeFetch(robotsURL, { timeoutMs: options?.timeout });
 
     if (response.status === 200) {
       const parsedData = parseRobotsTxt(response.data);
@@ -53,13 +54,14 @@ export const robotsTxtHandler: AnalysisHandler<RobotsTxtResult> = async (url, op
         return { data: { robots: [], message: 'No robots.txt rules were found.' } };
       }
       return { data: parsedData };
+    } else if (response.status === 404) {
+      return { data: { robots: [], message: 'No robots.txt file is present on this site.' } };
     } else {
       return { error: `Failed to fetch robots.txt (status ${response.status})`, errorCode: 'NOT_FOUND', errorCategory: 'info' };
     }
   } catch (error) {
-    const axiosError = error as { response?: { status?: number } };
-    if (axiosError.response?.status === 404) {
-      return { data: { robots: [], message: 'No robots.txt file is present on this site.' } };
+    if (error instanceof SsrfBlockedError) {
+      return { error: 'Blocked: target resolves to private address' };
     }
     return { error: `Error fetching robots.txt: ${(error as Error).message}` };
   }

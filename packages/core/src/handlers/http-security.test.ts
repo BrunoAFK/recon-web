@@ -1,13 +1,23 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { httpSecurityHandler } from './http-security.js';
+import * as dns from 'node:dns/promises';
+
+vi.mock('node:dns/promises');
 
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  vi.restoreAllMocks();
+});
 afterAll(() => server.close());
+
+beforeEach(() => {
+  vi.mocked(dns.lookup).mockResolvedValue({ address: '93.184.216.34', family: 4 });
+});
 
 describe('httpSecurityHandler', () => {
   it('reports all security headers present when they exist', async () => {
@@ -96,5 +106,14 @@ describe('httpSecurityHandler', () => {
     const result = await httpSecurityHandler('https://mock-site.test');
     expect(result).toHaveProperty('error');
     expect(typeof result.error).toBe('string');
+  });
+});
+
+describe('http-security handler — SSRF', () => {
+  it('refuses to fetch a hostname that resolves to AWS metadata IP', async () => {
+    vi.spyOn(dns, 'lookup').mockResolvedValueOnce({ address: '169.254.169.254', family: 4 });
+    const result = await httpSecurityHandler('http://metadata.example.com/');
+    expect(result.error).toMatch(/private address|Blocked/i);
+    expect(result.data).toBeUndefined();
   });
 });

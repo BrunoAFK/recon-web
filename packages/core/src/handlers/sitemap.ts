@@ -1,7 +1,8 @@
-import axios from 'axios';
 import * as xml2js from 'xml2js';
 import type { AnalysisHandler } from '../types.js';
 import { normalizeUrl } from '../utils/url.js';
+import { safeFetch } from '../utils/safe-fetch.js';
+import { SsrfBlockedError } from '../utils/network.js';
 
 export interface SitemapResult {
   sitemapUrl: string;
@@ -68,7 +69,7 @@ function detectType(parsed: Record<string, unknown>): 'urlset' | 'sitemapindex' 
 export const sitemapHandler: AnalysisHandler<SitemapResult> = async (url, options) => {
   const targetUrl = normalizeUrl(url);
   const timeout = options?.timeout ?? 10_000;
-  const axiosOpts = { timeout, maxRedirects: 5 };
+  const fetchOpts = { timeoutMs: timeout, maxRedirects: 5 };
 
   // Strategy: try robots.txt first (it often has the canonical sitemap URL),
   // then fall back to common sitemap paths.
@@ -76,14 +77,17 @@ export const sitemapHandler: AnalysisHandler<SitemapResult> = async (url, option
 
   // 1. Try robots.txt for sitemap directives
   try {
-    const robotsRes = await axios.get(`${targetUrl}/robots.txt`, axiosOpts);
+    const robotsRes = await safeFetch(`${targetUrl}/robots.txt`, fetchOpts);
     if (typeof robotsRes.data === 'string') {
       const robotsSitemaps = extractSitemapUrlsFromRobots(robotsRes.data);
       for (const s of robotsSitemaps) {
         candidates.push({ url: s, source: 'robots.txt' });
       }
     }
-  } catch {
+  } catch (err) {
+    if (err instanceof SsrfBlockedError) {
+      return { error: 'Blocked: target resolves to private address' };
+    }
     // robots.txt not available — that's fine
   }
 
@@ -98,7 +102,7 @@ export const sitemapHandler: AnalysisHandler<SitemapResult> = async (url, option
   // 3. Try each candidate until one works
   for (const candidate of candidates) {
     try {
-      const res = await axios.get(candidate.url, axiosOpts);
+      const res = await safeFetch(candidate.url, fetchOpts);
       if (res.status !== 200 || typeof res.data !== 'string') continue;
 
       // Must look like XML
@@ -124,7 +128,10 @@ export const sitemapHandler: AnalysisHandler<SitemapResult> = async (url, option
           urls,
         },
       };
-    } catch {
+    } catch (err) {
+      if (err instanceof SsrfBlockedError) {
+        return { error: 'Blocked: target resolves to private address' };
+      }
       continue; // Network error — try next candidate
     }
   }

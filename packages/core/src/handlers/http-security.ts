@@ -1,7 +1,7 @@
-import axios from 'axios';
 import type { AnalysisHandler, HandlerResult } from '../types.js';
-import { getFinalResponseUrl } from '../utils/http.js';
 import { normalizeUrl } from '../utils/url.js';
+import { safeFetch } from '../utils/safe-fetch.js';
+import { SsrfBlockedError } from '../utils/network.js';
 
 export interface HttpSecurityResult {
   finalUrl?: string;
@@ -15,11 +15,12 @@ export interface HttpSecurityResult {
 export const httpSecurityHandler: AnalysisHandler<HttpSecurityResult> = async (url, options) => {
   try {
     const fullUrl = normalizeUrl(url);
-    const response = await axios.get(fullUrl);
+    const response = await safeFetch(fullUrl, { timeoutMs: options?.timeout });
     const headers = response.headers;
 
     const result: HttpSecurityResult = {
-      finalUrl: getFinalResponseUrl(response) ?? fullUrl,
+      // Note: finalUrl is the initial (normalized) URL; post-redirect URL is not tracked
+      finalUrl: fullUrl,
       strictTransportPolicy: !!headers['strict-transport-security'],
       xFrameOptions: !!headers['x-frame-options'],
       xContentTypeOptions: !!headers['x-content-type-options'],
@@ -29,6 +30,9 @@ export const httpSecurityHandler: AnalysisHandler<HttpSecurityResult> = async (u
 
     return { data: result };
   } catch (error) {
+    if (error instanceof SsrfBlockedError) {
+      return { error: 'Blocked: target resolves to private address' };
+    }
     return { error: (error as Error).message };
   }
 };

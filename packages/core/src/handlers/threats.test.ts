@@ -1,13 +1,23 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { threatsHandler } from './threats.js';
+import * as dns from 'node:dns/promises';
+
+vi.mock('node:dns/promises');
 
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  vi.restoreAllMocks();
+});
 afterAll(() => server.close());
+
+beforeEach(() => {
+  vi.mocked(dns.lookup).mockResolvedValue({ address: '93.184.216.34', family: 4 });
+});
 
 const TEST_URL = 'https://example.com';
 
@@ -142,6 +152,7 @@ describe('threatsHandler', () => {
   });
 
   it('returns partial data when some requests fail with network errors', async () => {
+    vi.mocked(dns.lookup).mockResolvedValue({ address: '93.184.216.34', family: 4 });
     server.use(
       http.post('https://urlhaus-api.abuse.ch/v1/host/', () => {
         return HttpResponse.error();
@@ -175,5 +186,18 @@ describe('threatsHandler', () => {
     expect(data.phishTank.in_database).toBe('false');
     expect(data.cloudmersive.CleanResult).toBe(true);
     expect(data.safeBrowsing.unsafe).toBe(false);
+  });
+});
+
+describe('threats handler — SSRF', () => {
+  it('blocks requests when threat API endpoints resolve to private addresses', async () => {
+    // All API endpoints resolve to private IP — each sub-request is blocked by safeFetch
+    vi.mocked(dns.lookup).mockResolvedValue({ address: '169.254.169.254', family: 4 });
+
+    const result = await threatsHandler(TEST_URL, options);
+    // All four sub-checks fail with SSRF block errors, triggering top-level error
+    expect(result.error).toBeDefined();
+    expect(typeof result.error).toBe('string');
+    expect(result.data).toBeUndefined();
   });
 });
