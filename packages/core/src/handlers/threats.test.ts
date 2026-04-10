@@ -196,8 +196,7 @@ describe('threats handler — SSRF', () => {
 
     const result = await threatsHandler(TEST_URL, options);
     // All four sub-checks fail with SSRF block errors, triggering top-level error
-    expect(result.error).toBeDefined();
-    expect(typeof result.error).toBe('string');
+    expect(result.error).toMatch(/Blocked.*private address/i);
     expect(result.data).toBeUndefined();
   });
 });

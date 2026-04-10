@@ -3,7 +3,7 @@ import type { AnalysisHandler, HandlerResult, HandlerOptions } from '../types.js
 import { extractHostname, normalizeUrl } from '../utils/url.js';
 import { withRetry } from '../utils/retry.js';
 import { safeFetch } from '../utils/safe-fetch.js';
-import { SsrfBlockedError } from '../utils/network.js';
+import { SsrfBlockedError, assertPublicHost } from '../utils/network.js';
 
 export interface GoogleSafeBrowsingResult {
   unsafe?: boolean;
@@ -144,6 +144,17 @@ const getCloudmersiveResult = async (
 
 export const threatsHandler: AnalysisHandler<ThreatsResult> = async (url, options) => {
   try {
+    // Top-level SSRF gate: validate target URL before any sub-handler runs
+    const parsedUrl = new URL(url);
+    try {
+      await assertPublicHost(parsedUrl.hostname);
+    } catch (err) {
+      if (err instanceof SsrfBlockedError) {
+        return { error: 'Blocked: target resolves to private address' };
+      }
+      // URL parse errors or other issues fall through to normal handling
+    }
+
     const googleApiKey = options?.apiKeys?.GOOGLE_CLOUD_API_KEY;
     const cloudmersiveApiKey = options?.apiKeys?.CLOUDMERSIVE_API_KEY;
 
