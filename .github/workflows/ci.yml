@@ -16,7 +16,7 @@ env:
   TRIVY_SEVERITY_IMAGE: CRITICAL
 
 permissions:
-  contents: read
+  contents: write   # write needed for softprops/action-gh-release to attach SBOM
   packages: write
   security-events: write
   id-token: write   # required for cosign keyless OIDC signing
