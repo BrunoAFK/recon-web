@@ -18,6 +18,13 @@ services:
       interval: 30s
       timeout: 5s
       start_period: 10s
+    # Required for Chromium user-namespace sandbox in screenshot handler.
+    # Application-layer SSRF guard (utils/safe-fetch.ts, utils/network.ts) is
+    # the primary defense — the sandbox is defense in depth.
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp=unconfined
 
   web:
     build:

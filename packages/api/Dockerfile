@@ -40,6 +40,12 @@ RUN apt-get update && \
       libgbm1 \
     && rm -rf /var/lib/apt/lists/*
 
+# Ensure Chromium namespace sandbox has correct permissions when present.
+RUN if [ -f /usr/lib/chromium/chrome-sandbox ]; then \
+      chown root:root /usr/lib/chromium/chrome-sandbox && \
+      chmod 4755 /usr/lib/chromium/chrome-sandbox; \
+    fi
+
 WORKDIR /app
 
 COPY package.json package-lock.json ./
