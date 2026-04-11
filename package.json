@@ -20,6 +20,9 @@
     "build:static": "npm run build -w @recon-web/web && npm run build -w @recon-web/static",
     "prepare": "husky || true"
   },
+  "overrides": {
+    "basic-ftp": "^5.2.2"
+  },
   "devDependencies": {
     "husky": "^9.1.7"
   }
