@@ -1,7 +1,7 @@
-import axios from 'axios';
 import type { AnalysisHandler, HandlerResult } from '../types.js';
-import { getFinalResponseUrl } from '../utils/http.js';
 import { normalizeUrl } from '../utils/url.js';
+import { safeFetch } from '../utils/safe-fetch.js';
+import { SsrfBlockedError } from '../utils/network.js';
 
 export interface FirewallResult {
   hasWaf: boolean;
@@ -41,10 +41,13 @@ const detectWaf = (headers: Record<string, string>): FirewallResult => {
 export const firewallHandler: AnalysisHandler<FirewallResult> = async (url, options) => {
   try {
     const fullUrl = normalizeUrl(url);
-    const response = await axios.get(fullUrl);
+    const response = await safeFetch(fullUrl, { timeoutMs: options?.timeout });
     const result = detectWaf(response.headers as Record<string, string>);
-    return { data: { ...result, finalUrl: getFinalResponseUrl(response) ?? fullUrl } };
+    return { data: { ...result, finalUrl: fullUrl } };
   } catch (error) {
+    if (error instanceof SsrfBlockedError) {
+      return { error: 'Blocked: target resolves to private address' };
+    }
     return { error: (error as Error).message };
   }
 };

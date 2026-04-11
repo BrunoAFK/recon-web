@@ -4,6 +4,7 @@ import csv from 'csv-parser';
 import fs from 'fs';
 import type { AnalysisHandler, HandlerResult } from '../types.js';
 import { normalizeUrl } from '../utils/url.js';
+import { assertPublicHost, SsrfBlockedError } from '../utils/network.js';
 
 const FILE_URL = 'https://s3-us-west-1.amazonaws.com/umbrella-static/top-1m.csv.zip';
 const TEMP_FILE_PATH = '/tmp/top-1m.csv';
@@ -27,6 +28,10 @@ export const legacyRankHandler: AnalysisHandler<LegacyRankResult> = async (url, 
   try {
     // Download and unzip the file if not in cache
     if (!fs.existsSync(TEMP_FILE_PATH)) {
+      // Validate that FILE_URL resolves to a public host before downloading
+      const fileUrlParsed = new URL(FILE_URL);
+      await assertPublicHost(fileUrlParsed.hostname);
+
       const response = await axios({
         method: 'GET',
         url: FILE_URL,
@@ -72,6 +77,9 @@ export const legacyRankHandler: AnalysisHandler<LegacyRankResult> = async (url, 
         .on('error', reject);
     });
   } catch (error) {
+    if (error instanceof SsrfBlockedError) {
+      return { error: 'Blocked: target resolves to private address' };
+    }
     return { error: (error as Error).message };
   }
 };

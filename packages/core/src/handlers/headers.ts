@@ -1,7 +1,7 @@
-import axios from 'axios';
 import type { AnalysisHandler, HandlerResult } from '../types.js';
-import { getFinalResponseUrl } from '../utils/http.js';
 import { normalizeUrl } from '../utils/url.js';
+import { safeFetch } from '../utils/safe-fetch.js';
+import { SsrfBlockedError } from '../utils/network.js';
 
 export interface HeadersResult {
   finalUrl?: string;
@@ -11,18 +11,20 @@ export interface HeadersResult {
 export const headersHandler: AnalysisHandler<HeadersResult> = async (url, options) => {
   try {
     const targetUrl = normalizeUrl(url);
-    const response = await axios.get(targetUrl, {
-      timeout: options?.timeout,
-      validateStatus: (status: number) => status >= 200 && status < 600,
-    });
+    const response = await safeFetch(targetUrl, { timeoutMs: options?.timeout });
 
     return {
       data: {
         ...(response.headers as HeadersResult),
-        finalUrl: getFinalResponseUrl(response) ?? targetUrl,
+        // Note: finalUrl is the initial (normalized) URL; post-redirect URL is not tracked
+        // because safeFetch handles redirects internally without exposing the final URL.
+        finalUrl: targetUrl,
       },
     };
   } catch (error) {
+    if (error instanceof SsrfBlockedError) {
+      return { error: 'Blocked: target resolves to private address' };
+    }
     return { error: (error as Error).message };
   }
 };

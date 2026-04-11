@@ -1,8 +1,8 @@
-import axios from 'axios';
 import * as cheerio from 'cheerio';
 import type { AnalysisHandler, HandlerResult } from '../types.js';
 import { normalizeUrl } from '../utils/url.js';
-import { getFinalResponseUrl } from '../utils/http.js';
+import { safeFetch } from '../utils/safe-fetch.js';
+import { SsrfBlockedError } from '../utils/network.js';
 
 export interface LinkedPagesResult {
   internal: string[];
@@ -14,8 +14,9 @@ export interface LinkedPagesResult {
 export const linkedPagesHandler: AnalysisHandler<LinkedPagesResult> = async (url, options) => {
   try {
     const targetUrl = normalizeUrl(url);
-    const response = await axios.get(targetUrl, { timeout: options?.timeout });
-    const finalUrl = getFinalResponseUrl(response) ?? targetUrl;
+    const response = await safeFetch(targetUrl, { timeoutMs: options?.timeout });
+    // Note: finalUrl is the initial (normalized) URL; post-redirect URL is not tracked
+    const finalUrl = targetUrl;
     const finalOrigin = new URL(finalUrl).origin;
     const html: string = response.data;
     const $ = cheerio.load(html);
@@ -56,6 +57,9 @@ export const linkedPagesHandler: AnalysisHandler<LinkedPagesResult> = async (url
 
     return { data: { internal, external, finalUrl } };
   } catch (error) {
+    if (error instanceof SsrfBlockedError) {
+      return { error: 'Blocked: target resolves to private address' };
+    }
     return { error: (error as Error).message };
   }
 };

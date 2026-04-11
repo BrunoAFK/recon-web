@@ -1,13 +1,23 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { techStackHandler } from './tech-stack.js';
+import * as dns from 'node:dns/promises';
+
+vi.mock('node:dns/promises');
 
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  vi.restoreAllMocks();
+});
 afterAll(() => server.close());
+
+beforeEach(() => {
+  vi.mocked(dns.lookup).mockResolvedValue({ address: '93.184.216.34', family: 4 });
+});
 
 const TEST_URL = 'https://mock-site.test/';
 
@@ -146,5 +156,14 @@ describe('techStackHandler', () => {
     const names = techs.map((t) => t.name);
     expect(names).toContain('Nginx');
     expect(names).toContain('Express');
+  });
+});
+
+describe('tech-stack handler — SSRF', () => {
+  it('refuses to fetch a hostname that resolves to AWS metadata IP', async () => {
+    vi.spyOn(dns, 'lookup').mockResolvedValueOnce({ address: '169.254.169.254', family: 4 });
+    const result = await techStackHandler('http://metadata.example.com/');
+    expect(result.error).toMatch(/private address|Blocked/i);
+    expect(result.data).toBeUndefined();
   });
 });

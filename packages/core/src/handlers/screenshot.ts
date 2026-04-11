@@ -4,6 +4,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import type { AnalysisHandler, HandlerResult } from '../types.js';
+import { assertPublicHost, SsrfBlockedError } from '../utils/network.js';
 
 export interface ScreenshotResult {
   image: string;
@@ -27,7 +28,8 @@ const directChromiumScreenshot = async (url: string, chromePath: string): Promis
     const args = [
       '--headless',
       '--disable-gpu',
-      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
       '--hide-scrollbars',
       '--window-size=1440,2200',
       '--run-all-compositor-stages-before-draw',
@@ -54,6 +56,25 @@ const directChromiumScreenshot = async (url: string, chromePath: string): Promis
 };
 
 export const screenshotHandler: AnalysisHandler<ScreenshotResult> = async (url, options) => {
+  // URL + SSRF validation before launching Chromium.
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { error: `Invalid URL: ${url}` };
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { error: `Blocked protocol: ${parsed.protocol}` };
+  }
+  try {
+    await assertPublicHost(parsed.hostname);
+  } catch (e) {
+    if (e instanceof SsrfBlockedError) {
+      return { error: `Blocked: target resolves to private address` };
+    }
+    throw e;
+  }
+
   let targetUrl = url;
 
   if (!targetUrl) {
@@ -65,8 +86,8 @@ export const screenshotHandler: AnalysisHandler<ScreenshotResult> = async (url, 
   }
 
   try {
-    const parsed = new URL(targetUrl);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    const parsed2 = new URL(targetUrl);
+    if (parsed2.protocol !== 'http:' && parsed2.protocol !== 'https:') {
       return { error: 'URL provided is invalid', errorCode: 'INVALID_URL', errorCategory: 'tool' };
     }
   } catch {
@@ -84,7 +105,7 @@ export const screenshotHandler: AnalysisHandler<ScreenshotResult> = async (url, 
     // @ts-ignore puppeteer-core is an optional peer dependency
     const puppeteer = await import('puppeteer-core');
     browser = await puppeteer.default.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--ignore-certificate-errors'],
+      args: ['--disable-setuid-sandbox', '--disable-dev-shm-usage', '--ignore-certificate-errors'],
       defaultViewport: { width: 1440, height: 900 },
       executablePath: chromePath,
       headless: true,

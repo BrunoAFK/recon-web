@@ -1,6 +1,7 @@
-import axios from 'axios';
 import type { AnalysisHandler, HandlerResult } from '../types.js';
 import { withRetry } from '../utils/retry.js';
+import { safeFetch } from '../utils/safe-fetch.js';
+import { SsrfBlockedError } from '../utils/network.js';
 
 export interface QualityResult {
   [key: string]: unknown;
@@ -24,18 +25,21 @@ export const qualityHandler: AnalysisHandler<QualityResult> = async (url, option
       `&key=${apiKey}`;
 
     const response = await withRetry(
-      () => axios.get(endpoint, { timeout: options?.timeout }),
+      () => safeFetch(endpoint, { timeoutMs: options?.timeout }),
     );
-    return { data: response.data as QualityResult };
-  } catch (error) {
-    const axiosErr = error as any;
-    if (axiosErr.response) {
-      const status = axiosErr.response.status;
-      const detail = axiosErr.response.data?.error;
+
+    if (response.status >= 400) {
+      const detail = response.data?.error;
       const msg = detail
         ? `${detail.message}${detail.status ? ` [${detail.status}]` : ''}${detail.errors?.length ? ` — ${detail.errors.map((e: any) => e.reason).join(', ')}` : ''}`
-        : JSON.stringify(axiosErr.response.data);
-      return { error: `PageSpeed API ${status}: ${msg}` };
+        : JSON.stringify(response.data);
+      return { error: `PageSpeed API ${response.status}: ${msg}` };
+    }
+
+    return { data: response.data as QualityResult };
+  } catch (error) {
+    if (error instanceof SsrfBlockedError) {
+      return { error: 'Blocked: target resolves to private address' };
     }
     return { error: (error as Error).message };
   }

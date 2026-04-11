@@ -54,6 +54,70 @@ describe('isPrivateIP', () => {
   it('allows public IPv6', () => {
     expect(isPrivateIP('2001:4860:4860::8888')).toBe(false);
   });
+
+  it('detects 0.0.0.0/8 unspecified range', () => {
+    expect(isPrivateIP('0.0.0.0')).toBe(true);
+    expect(isPrivateIP('0.255.255.255')).toBe(true);
+  });
+
+  it('detects 100.64.0.0/10 CGNAT range', () => {
+    expect(isPrivateIP('100.64.0.1')).toBe(true);
+    expect(isPrivateIP('100.127.255.255')).toBe(true);
+    expect(isPrivateIP('100.63.255.255')).toBe(false);
+    expect(isPrivateIP('100.128.0.0')).toBe(false);
+  });
+
+  it('detects 198.18.0.0/15 benchmark range', () => {
+    expect(isPrivateIP('198.18.0.1')).toBe(true);
+    expect(isPrivateIP('198.19.255.255')).toBe(true);
+    expect(isPrivateIP('198.17.255.255')).toBe(false);
+    expect(isPrivateIP('198.20.0.0')).toBe(false);
+  });
+
+  it('detects 224.0.0.0/4 multicast range', () => {
+    expect(isPrivateIP('224.0.0.1')).toBe(true);
+    expect(isPrivateIP('239.255.255.255')).toBe(true);
+  });
+
+  it('detects 240.0.0.0/4 reserved range', () => {
+    expect(isPrivateIP('240.0.0.1')).toBe(true);
+    expect(isPrivateIP('255.255.255.254')).toBe(true);
+  });
+
+  it('detects metadata service IP explicitly', () => {
+    expect(isPrivateIP('169.254.169.254')).toBe(true);
+    expect(isPrivateIP('169.254.170.2')).toBe(true); // ECS task metadata
+  });
+});
+
+describe('isPrivateIP IPv6', () => {
+  it('detects loopback', () => {
+    expect(isPrivateIP('::1')).toBe(true);
+  });
+  it('detects ULA fc00::/7', () => {
+    expect(isPrivateIP('fc00::1')).toBe(true);
+    expect(isPrivateIP('fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff')).toBe(true);
+  });
+  it('detects link-local fe80::/10', () => {
+    expect(isPrivateIP('fe80::1')).toBe(true);
+    expect(isPrivateIP('febf::ffff')).toBe(true);
+  });
+  it('detects multicast ff00::/8', () => {
+    expect(isPrivateIP('ff00::1')).toBe(true);
+    expect(isPrivateIP('ff02::1')).toBe(true);
+  });
+  it('detects documentation 2001:db8::/32', () => {
+    expect(isPrivateIP('2001:db8::1')).toBe(true);
+  });
+  it('detects IPv4-mapped private addresses', () => {
+    expect(isPrivateIP('::ffff:127.0.0.1')).toBe(true);
+    expect(isPrivateIP('::ffff:169.254.169.254')).toBe(true);
+    expect(isPrivateIP('::ffff:10.0.0.1')).toBe(true);
+  });
+  it('does not flag public IPv6', () => {
+    expect(isPrivateIP('2606:4700:4700::1111')).toBe(false); // Cloudflare
+    expect(isPrivateIP('2001:4860:4860::8888')).toBe(false); // Google
+  });
 });
 
 describe('assertPublicHost', () => {
@@ -62,6 +126,6 @@ describe('assertPublicHost', () => {
   });
 
   it('allows public domains', async () => {
-    await expect(assertPublicHost('example.com')).resolves.toBeUndefined();
+    await expect(assertPublicHost('example.com')).resolves.toBeDefined();
   });
 });

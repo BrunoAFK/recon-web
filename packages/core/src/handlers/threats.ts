@@ -1,8 +1,9 @@
-import axios from 'axios';
 import * as xml2js from 'xml2js';
 import type { AnalysisHandler, HandlerResult, HandlerOptions } from '../types.js';
 import { extractHostname, normalizeUrl } from '../utils/url.js';
 import { withRetry } from '../utils/retry.js';
+import { safeFetch } from '../utils/safe-fetch.js';
+import { SsrfBlockedError, assertPublicHost } from '../utils/network.js';
 
 export interface GoogleSafeBrowsingResult {
   unsafe?: boolean;
@@ -66,7 +67,11 @@ const getGoogleSafeBrowsingResult = async (
     };
 
     const response = await withRetry(() =>
-      axios.post(apiEndpoint, requestBody, { headers: { 'x-goog-api-key': apiKey } }),
+      safeFetch(apiEndpoint, {
+        method: 'POST',
+        data: requestBody,
+        headers: { 'x-goog-api-key': apiKey },
+      }),
     );
     if (response.data && response.data.matches) {
       return { unsafe: true, details: response.data.matches };
@@ -81,9 +86,8 @@ const getUrlHausResult = async (url: string): Promise<UrlHausResult> => {
   try {
     const domain = extractHostname(url);
     const response = await withRetry(() =>
-      axios({
-        method: 'post',
-        url: 'https://urlhaus-api.abuse.ch/v1/host/',
+      safeFetch('https://urlhaus-api.abuse.ch/v1/host/', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         data: `host=${domain}`,
       }),
@@ -98,9 +102,12 @@ const getPhishTankResult = async (url: string): Promise<PhishTankResult> => {
   try {
     const encodedUrl = Buffer.from(url).toString('base64');
     const endpoint = `https://checkurl.phishtank.com/checkurl/?url=${encodedUrl}`;
-    const headers = { 'User-Agent': 'phishtank/recon-web' };
     const response = await withRetry(() =>
-      axios.post(endpoint, null, { headers, timeout: 3000 }),
+      safeFetch(endpoint, {
+        method: 'POST',
+        headers: { 'User-Agent': 'phishtank/recon-web' },
+        timeoutMs: 3000,
+      }),
     );
     const parsed = await xml2js.parseStringPromise(response.data, { explicitArray: false });
     return parsed.response.results;
@@ -118,13 +125,16 @@ const getCloudmersiveResult = async (
   }
   try {
     const endpoint = 'https://api.cloudmersive.com/virus/scan/website';
-    const headers = {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      Apikey: apiKey,
-    };
     const data = `Url=${encodeURIComponent(url)}`;
     const response = await withRetry(() =>
-      axios.post(endpoint, data, { headers }),
+      safeFetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Apikey: apiKey,
+        },
+        data,
+      }),
     );
     return response.data;
   } catch (error) {
@@ -134,6 +144,17 @@ const getCloudmersiveResult = async (
 
 export const threatsHandler: AnalysisHandler<ThreatsResult> = async (url, options) => {
   try {
+    // Top-level SSRF gate: validate target URL before any sub-handler runs
+    const parsedUrl = new URL(url);
+    try {
+      await assertPublicHost(parsedUrl.hostname);
+    } catch (err) {
+      if (err instanceof SsrfBlockedError) {
+        return { error: 'Blocked: target resolves to private address' };
+      }
+      // URL parse errors or other issues fall through to normal handling
+    }
+
     const googleApiKey = options?.apiKeys?.GOOGLE_CLOUD_API_KEY;
     const cloudmersiveApiKey = options?.apiKeys?.CLOUDMERSIVE_API_KEY;
 

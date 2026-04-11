@@ -1,7 +1,7 @@
 {
   "name": "recon-web",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.2.0",
   "license": "GPL-2.0-only",
   "type": "module",
   "workspaces": [
@@ -19,6 +19,9 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build:static": "npm run build -w @recon-web/web && npm run build -w @recon-web/static",
     "prepare": "husky || true"
+  },
+  "overrides": {
+    "basic-ftp": "^5.2.2"
   },
   "devDependencies": {
     "husky": "^9.1.7"

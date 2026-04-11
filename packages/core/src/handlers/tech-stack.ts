@@ -1,8 +1,8 @@
-import axios from 'axios';
 import * as cheerio from 'cheerio';
 import type { AnalysisHandler, HandlerResult } from '../types.js';
-import { getFinalResponseUrl } from '../utils/http.js';
 import { normalizeUrl } from '../utils/url.js';
+import { safeFetch } from '../utils/safe-fetch.js';
+import { SsrfBlockedError } from '../utils/network.js';
 
 interface DetectedTechnology {
   name: string;
@@ -205,13 +205,14 @@ const KNOWN_TECH_PATTERNS: TechPattern[] = [
 export const techStackHandler: AnalysisHandler<TechStackResult> = async (url, options) => {
   try {
     const targetUrl = normalizeUrl(url);
-    const response = await axios.get(targetUrl, {
-      timeout: options?.timeout ?? 10000,
+    const response = await safeFetch(targetUrl, {
+      timeoutMs: options?.timeout ?? 10000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; WebAnalysis/1.0)',
       },
     });
-    const finalUrl = getFinalResponseUrl(response) ?? targetUrl;
+    // Note: finalUrl is the initial (normalized) URL; post-redirect URL is not tracked
+    const finalUrl = targetUrl;
 
     const html: string = response.data;
     const responseHeaders: Record<string, string> = {};
@@ -350,6 +351,9 @@ export const techStackHandler: AnalysisHandler<TechStackResult> = async (url, op
 
     return { data: { technologies: detected, finalUrl } };
   } catch (error) {
+    if (error instanceof SsrfBlockedError) {
+      return { error: 'Blocked: target resolves to private address' };
+    }
     return { error: (error as Error).message };
   }
 };

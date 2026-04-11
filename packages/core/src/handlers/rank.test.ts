@@ -1,13 +1,23 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { rankHandler } from './rank.js';
+import * as dns from 'node:dns/promises';
+
+vi.mock('node:dns/promises');
 
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  vi.restoreAllMocks();
+});
 afterAll(() => server.close());
+
+beforeEach(() => {
+  vi.mocked(dns.lookup).mockResolvedValue({ address: '93.184.216.34', family: 4 });
+});
 
 const TEST_URL = 'https://example.com';
 
@@ -80,6 +90,7 @@ describe('rankHandler', () => {
   });
 
   it('passes authentication config when API key is provided', async () => {
+    vi.mocked(dns.lookup).mockResolvedValue({ address: '93.184.216.34', family: 4 });
     let receivedAuth: string | null = null;
 
     server.use(
@@ -103,5 +114,14 @@ describe('rankHandler', () => {
     // Basic auth should have been sent
     expect(receivedAuth).toBeDefined();
     expect(receivedAuth).toContain('Basic');
+  });
+});
+
+describe('rank handler — SSRF', () => {
+  it('refuses to fetch a hostname that resolves to AWS metadata IP', async () => {
+    vi.spyOn(dns, 'lookup').mockResolvedValueOnce({ address: '169.254.169.254', family: 4 });
+    const result = await rankHandler('http://metadata.example.com/');
+    expect(result.error).toMatch(/private address|Blocked/i);
+    expect(result.data).toBeUndefined();
   });
 });

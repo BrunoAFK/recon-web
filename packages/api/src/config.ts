@@ -30,7 +30,9 @@ export const config = {
   port: parseInt(process.env.PORT || '3000', 10),
   host: process.env.HOST || '0.0.0.0',
   timeoutLimit: parseInt(process.env.API_TIMEOUT_LIMIT || '30000', 10),
-  corsOrigin: process.env.API_CORS_ORIGIN || '*',
+  corsOrigin: process.env.API_CORS_ORIGIN
+    ? process.env.API_CORS_ORIGIN.split(',').map((s) => s.trim())
+    : false,
   chromePath: detectChromePath(),
   staticDir: process.env.STATIC_DIR || undefined,
   maxConcurrency: parseInt(process.env.MAX_CONCURRENCY || '8', 10),

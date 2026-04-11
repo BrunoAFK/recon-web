@@ -1,5 +1,6 @@
-import axios from 'axios';
 import type { AnalysisHandler, HandlerResult } from '../types.js';
+import { safeFetch } from '../utils/safe-fetch.js';
+import { SsrfBlockedError } from '../utils/network.js';
 
 interface ScanFrequency {
   daysBetweenScans: number;
@@ -72,7 +73,8 @@ export const archivesHandler: AnalysisHandler<ArchivesResult> = async (url, opti
   const cdxUrl = `https://web.archive.org/cdx/search/cdx?url=${url}&output=json&fl=timestamp,statuscode,digest,length,offset`;
 
   try {
-    const { data } = await axios.get(cdxUrl, { timeout: options?.timeout });
+    const response = await safeFetch(cdxUrl, { timeoutMs: options?.timeout });
+    const data = response.data;
 
     if (!data || !Array.isArray(data) || data.length <= 1) {
       return {
@@ -101,6 +103,9 @@ export const archivesHandler: AnalysisHandler<ArchivesResult> = async (url, opti
       },
     };
   } catch (error) {
+    if (error instanceof SsrfBlockedError) {
+      return { error: 'Blocked: target resolves to private address' };
+    }
     return { error: `Error fetching Wayback data: ${(error as Error).message}` };
   }
 };

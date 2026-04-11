@@ -19,6 +19,7 @@ permissions:
   contents: read
   packages: write
   security-events: write
+  id-token: write   # required for cosign keyless OIDC signing
 
 jobs:
   # ── Stage 1: Lint + Typecheck ──────────────────────────────
@@ -159,3 +160,28 @@ jobs:
             ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ github.event.release.tag_name }}
             ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:latest
           cache-from: type=gha,scope=${{ matrix.image }}
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign image with cosign (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          cosign sign --yes \
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ github.event.release.tag_name }}
+          cosign sign --yes \
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:latest
+
+      - name: Generate SBOM with syft
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE_PREFIX }}/${{ matrix.image }}:${{ github.event.release.tag_name }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.image }}.spdx.json
+          upload-artifact: false
+
+      - name: Attach SBOM to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: sbom-${{ matrix.image }}.spdx.json

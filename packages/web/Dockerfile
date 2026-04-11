@@ -39,5 +39,15 @@ COPY --from=build /app/packages/web/dist /usr/share/nginx/html
 COPY packages/web/nginx.conf.template /etc/nginx/templates/default.conf.template
 
 ENV API_UPSTREAM=http://api:3000
+# HSTS is opt-in. Set HSTS_HEADER to "max-age=31536000; includeSubDomains" when
+# the deployment is behind TLS; default empty string emits a no-op header.
+ENV HSTS_HEADER=""
 
-EXPOSE 80
+# Non-root runtime user. nginx alpine ships with an unprivileged 'nginx' user
+# (UID 101). We rebind to 8080 (unprivileged) so we don't need CAP_NET_BIND_SERVICE.
+RUN sed -i 's|listen 80;|listen 8080;|' /etc/nginx/templates/default.conf.template && \
+    chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx /etc/nginx/conf.d /etc/nginx/templates && \
+    touch /var/run/nginx.pid && chown nginx:nginx /var/run/nginx.pid
+USER nginx
+
+EXPOSE 8080

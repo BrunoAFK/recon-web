@@ -1,13 +1,23 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { firewallHandler } from './firewall.js';
+import * as dns from 'node:dns/promises';
+
+vi.mock('node:dns/promises');
 
 const server = setupServer();
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }));
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  vi.restoreAllMocks();
+});
 afterAll(() => server.close());
+
+beforeEach(() => {
+  vi.mocked(dns.lookup).mockResolvedValue({ address: '93.184.216.34', family: 4 });
+});
 
 describe('firewallHandler', () => {
   it('detects Cloudflare WAF from server header', async () => {
@@ -84,5 +94,14 @@ describe('firewallHandler', () => {
     const result = await firewallHandler('https://mock-site.test');
     expect(result).toHaveProperty('error');
     expect(typeof result.error).toBe('string');
+  });
+});
+
+describe('firewall handler — SSRF', () => {
+  it('refuses to fetch a hostname that resolves to AWS metadata IP', async () => {
+    vi.spyOn(dns, 'lookup').mockResolvedValueOnce({ address: '169.254.169.254', family: 4 });
+    const result = await firewallHandler('http://metadata.example.com/');
+    expect(result.error).toMatch(/private address|Blocked/i);
+    expect(result.data).toBeUndefined();
   });
 });

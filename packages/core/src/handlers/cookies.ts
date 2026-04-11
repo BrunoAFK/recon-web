@@ -1,7 +1,7 @@
-import axios from 'axios';
 import type { AnalysisHandler, HandlerResult } from '../types.js';
-import { getFinalResponseUrl } from '../utils/http.js';
 import { normalizeUrl } from '../utils/url.js';
+import { safeFetch } from '../utils/safe-fetch.js';
+import { SsrfBlockedError } from '../utils/network.js';
 
 interface CookieEntry {
   name: string;
@@ -25,25 +25,18 @@ export interface CookiesResult {
 export const cookiesHandler: AnalysisHandler<CookiesResult> = async (url, options) => {
   const targetUrl = normalizeUrl(url);
   let headerCookies: string[] | null = null;
-  let finalUrl: string | undefined;
 
   try {
-    const response = await axios.get(targetUrl, {
-      withCredentials: true,
+    const response = await safeFetch(targetUrl, {
+      timeoutMs: options?.timeout,
       maxRedirects: 5,
-      timeout: options?.timeout,
     });
     headerCookies = (response.headers['set-cookie'] as string[] | undefined) ?? null;
-    finalUrl = getFinalResponseUrl(response) ?? targetUrl;
   } catch (error) {
-    const axiosError = error as any;
-    if (axiosError.response) {
-      return { error: `Request failed with status ${axiosError.response.status}: ${axiosError.message}` };
-    } else if (axiosError.request) {
-      return { error: `No response received: ${axiosError.message}` };
-    } else {
-      return { error: `Error setting up request: ${(error as Error).message}` };
+    if (error instanceof SsrfBlockedError) {
+      return { error: 'Blocked: target resolves to private address' };
     }
+    return { error: `Error setting up request: ${(error as Error).message}` };
   }
 
   // Client-side cookies require puppeteer, which is not available in core.
@@ -51,8 +44,8 @@ export const cookiesHandler: AnalysisHandler<CookiesResult> = async (url, option
   const clientCookies: CookieEntry[] | null = null as CookieEntry[] | null;
 
   if (!headerCookies && (!clientCookies || clientCookies.length === 0)) {
-    return { data: { headerCookies, clientCookies, finalUrl, message: 'No cookies were detected in the server response.' } };
+    return { data: { headerCookies, clientCookies, finalUrl: targetUrl, message: 'No cookies were detected in the server response.' } };
   }
 
-  return { data: { headerCookies, clientCookies, finalUrl } };
+  return { data: { headerCookies, clientCookies, finalUrl: targetUrl } };
 };
