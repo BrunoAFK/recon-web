@@ -45,4 +45,8 @@ COPY --from=build /app/packages/cli/dist packages/cli/dist
 
 ENV NODE_ENV=production
 
+RUN addgroup -g 10001 app && adduser -D -G app -u 10001 app && \
+    mkdir -p /app/data && chown -R 10001:10001 /app
+USER 10001:10001
+
 ENTRYPOINT ["node", "packages/cli/dist/index.js"]

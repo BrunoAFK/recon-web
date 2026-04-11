@@ -75,4 +75,10 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:3000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
 
+# Non-root runtime user
+RUN groupadd -r app -g 10001 && useradd -r -g app -u 10001 -m -d /home/app app && \
+    mkdir -p /app/data && \
+    chown -R 10001:10001 /app /home/app
+USER 10001:10001
+
 CMD ["node", "packages/api/dist/index.js"]

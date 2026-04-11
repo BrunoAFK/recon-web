@@ -18,25 +18,43 @@ services:
       interval: 30s
       timeout: 5s
       start_period: 10s
+    user: "10001:10001"
     # Required for Chromium user-namespace sandbox in screenshot handler.
     # Application-layer SSRF guard (utils/safe-fetch.ts, utils/network.ts) is
     # the primary defense — the sandbox is defense in depth.
+    cap_drop:
+      - ALL
     cap_add:
       - SYS_ADMIN
     security_opt:
       - seccomp=unconfined
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /home/app/.cache
 
   web:
     build:
       context: .
       dockerfile: packages/web/Dockerfile
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - "${WEB_PORT:-8080}:8080"
     depends_on:
       api:
         condition: service_healthy
     environment:
       - API_UPSTREAM=http://api:3000
+    user: "101:101"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:uid=101,gid=101
+      - /run:uid=101,gid=101
+      - /etc/nginx/conf.d:uid=101,gid=101
 
   cli:
     build:
@@ -46,6 +64,11 @@ services:
     volumes:
       - scan-data:/app/data
     profiles: ["cli"]
+    user: "10001:10001"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   scan-data:
