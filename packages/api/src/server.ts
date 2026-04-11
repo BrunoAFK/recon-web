@@ -42,8 +42,16 @@ export async function buildServer(opts?: BuildServerOptions) {
   });
 
   await app.register(rateLimit, {
-    max: parseInt(process.env.RATE_LIMIT_MAX || '', 10) || 100,
-    timeWindow: process.env.RATE_LIMIT_WINDOW || '10 minutes',
+    global: true,
+    max: parseInt(process.env.RATE_LIMIT_MAX || '', 10) || 200,
+    timeWindow: process.env.RATE_LIMIT_WINDOW || '1 minute',
+    keyGenerator: (req) => req.ip,
+    addHeaders: {
+      'x-ratelimit-limit': true,
+      'x-ratelimit-remaining': true,
+      'x-ratelimit-reset': true,
+      'retry-after': true,
+    },
   });
 
   if (process.env.SWAGGER_ENABLED === 'true') {

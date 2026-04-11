@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { unlinkSync } from 'node:fs';
 import { buildServer } from './server.js';
@@ -19,6 +19,67 @@ afterAll(async () => {
   try { unlinkSync(testDbPath + '-wal'); } catch {}
   try { unlinkSync(testDbPath + '-shm'); } catch {}
   delete process.env.DB_PATH;
+});
+
+describe('server — CORS hardening', () => {
+  let app: Awaited<ReturnType<typeof buildServer>>;
+  let corsTestDbPath: string;
+
+  beforeEach(async () => {
+    delete process.env.API_CORS_ORIGIN;
+    corsTestDbPath = `/tmp/recon-web-cors-test-${randomUUID()}.db`;
+    process.env.DB_PATH = corsTestDbPath;
+    app = await buildServer();
+  });
+
+  afterEach(async () => {
+    await app.close();
+    try { unlinkSync(corsTestDbPath); } catch {}
+    try { unlinkSync(corsTestDbPath + '-wal'); } catch {}
+    try { unlinkSync(corsTestDbPath + '-shm'); } catch {}
+    delete process.env.DB_PATH;
+  });
+
+  it('does not return Access-Control-Allow-Origin: * by default', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/health',
+      headers: { origin: 'http://evil.example.com' },
+    });
+    expect(res.headers['access-control-allow-origin']).not.toBe('*');
+  });
+});
+
+describe('server — rate limiting', () => {
+  let app: Awaited<ReturnType<typeof buildServer>>;
+  let rateLimitTestDbPath: string;
+
+  beforeEach(async () => {
+    process.env.RATE_LIMIT_MAX = '5';
+    process.env.RATE_LIMIT_WINDOW = '1 minute';
+    rateLimitTestDbPath = `/tmp/recon-web-ratelimit-test-${randomUUID()}.db`;
+    process.env.DB_PATH = rateLimitTestDbPath;
+    app = await buildServer();
+  });
+
+  afterEach(async () => {
+    await app.close();
+    try { unlinkSync(rateLimitTestDbPath); } catch {}
+    try { unlinkSync(rateLimitTestDbPath + '-wal'); } catch {}
+    try { unlinkSync(rateLimitTestDbPath + '-shm'); } catch {}
+    delete process.env.RATE_LIMIT_MAX;
+    delete process.env.RATE_LIMIT_WINDOW;
+    delete process.env.DB_PATH;
+  });
+
+  it('returns 429 after burst exceeds the limit', async () => {
+    const responses = [];
+    for (let i = 0; i < 8; i++) {
+      responses.push(await app.inject({ method: 'GET', url: '/health' }));
+    }
+    const status = responses.map((r) => r.statusCode);
+    expect(status.filter((s) => s === 429).length).toBeGreaterThan(0);
+  });
 });
 
 describe('API', () => {
