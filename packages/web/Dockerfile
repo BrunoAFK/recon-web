@@ -39,5 +39,8 @@ COPY --from=build /app/packages/web/dist /usr/share/nginx/html
 COPY packages/web/nginx.conf.template /etc/nginx/templates/default.conf.template
 
 ENV API_UPSTREAM=http://api:3000
+# HSTS is opt-in. Set HSTS_HEADER to "max-age=31536000; includeSubDomains" when
+# the deployment is behind TLS; default empty string emits a no-op header.
+ENV HSTS_HEADER=""
 
 EXPOSE 80
