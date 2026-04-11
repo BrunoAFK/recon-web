@@ -186,6 +186,29 @@ docker run --rm ghcr.io/brunoafk/recon-web/cli scan example.com
 
 ---
 
+## Security
+
+recon-web v1.2.0+ ships with:
+
+- **SSRF protection** — All analysis handlers validate URLs against an
+  IP allowlist (no RFC1918, no link-local, no cloud metadata) and pin
+  connections to the validated IP to defeat DNS rebinding. Set
+  `RECON_ALLOW_PRIVATE_IPS=1` if you intentionally want to scan internal
+  hosts (lab environments only).
+- **Chromium sandbox** — Screenshot handler runs Chromium with the
+  user-namespace sandbox enabled. The container needs `SYS_ADMIN` +
+  `seccomp=unconfined` (already set in the bundled compose file).
+- **Non-root containers** — All images run as unprivileged users with
+  read-only rootfs and dropped capabilities.
+- **Strict CSP** — Web frontend ships a strict Content-Security-Policy.
+- **Signed images** — Release images are cosign-signed via GitHub
+  Actions OIDC. Verify before pulling in production.
+
+To report a security issue, please open a private security advisory on
+GitHub rather than a public issue.
+
+---
+
 ## Configuration
 
 Copy `.env.example` to `.env`. Everything is optional — the app works out of the box without any API keys.
