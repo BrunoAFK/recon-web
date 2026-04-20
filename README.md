@@ -27,6 +27,20 @@ docker compose up
 
 Open **http://localhost:8080** and enter any URL. Done.
 
+### Docker (pre-built images, no cloning)
+
+Just grab two files and run:
+
+```bash
+mkdir recon-web && cd recon-web
+curl -O https://raw.githubusercontent.com/BrunoAFK/recon-web/main/docker-compose.remote.yml
+curl -O https://raw.githubusercontent.com/BrunoAFK/recon-web/main/.env.example
+cp .env.example .env
+docker compose -f docker-compose.remote.yml up
+```
+
+This pulls pre-built images from GHCR. Same result, no build step.
+
 ### No Docker? Run from source
 
 Requires Node.js 24+.
