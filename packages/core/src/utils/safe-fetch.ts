@@ -62,12 +62,17 @@ function buildPinnedAgent(pinnedAddress: string, family: 4 | 6, isHttps: boolean
   // Custom lookup that always returns the pre-validated IP. Defeats DNS rebinding
   // because the IP we connect to is the IP we validated, not whatever DNS returns
   // on a second lookup.
+  // Node 24+ sends { all: true } and expects an array response.
   const customLookup = (
     _hostname: string,
-    _opts: unknown,
-    cb: (err: Error | null, address: string, family: number) => void,
+    opts: { all?: boolean },
+    cb: (err: Error | null, ...args: unknown[]) => void,
   ): void => {
-    cb(null, pinnedAddress, family);
+    if (opts.all) {
+      cb(null, [{ address: pinnedAddress, family }]);
+    } else {
+      cb(null, pinnedAddress, family);
+    }
   };
 
   const agentOptions = { lookup: customLookup as never, keepAlive: false };

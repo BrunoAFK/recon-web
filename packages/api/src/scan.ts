@@ -157,7 +157,7 @@ async function checkUrlReachable(
 
 export async function executeScan({
   db,
-  url,
+  url: rawUrl,
   handlerOptions,
   concurrency = 8,
   handlers,
@@ -165,6 +165,8 @@ export async function executeScan({
   signal,
   userId,
 }: ExecuteScanOptions): Promise<{ scanId: string; results: Record<string, HandlerResult>; durationMs: number }> {
+  const url = normalizeUrl(rawUrl);
+
   // Pre-flight reachability check (skip when running a targeted subset of handlers)
   if (!handlers) {
     await checkUrlReachable(url, signal);

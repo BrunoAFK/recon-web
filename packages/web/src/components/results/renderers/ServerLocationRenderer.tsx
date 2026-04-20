@@ -27,7 +27,7 @@ function LocationMap({ lat, lng, label }: { lat: number; lng: number; label: str
 
     const map = L.map(containerRef.current, {
       center: [lat, lng],
-      zoom: 2,
+      zoom: 4,
       zoomControl: false,
       attributionControl: false,
       scrollWheelZoom: false,
@@ -59,7 +59,19 @@ function LocationMap({ lat, lng, label }: { lat: number; lng: number; label: str
 
     mapRef.current = map;
 
+    // Leaflet miscalculates the center when the container isn't fully laid out yet.
+    // Wait for tiles to load, then force correct center.
+    map.whenReady(() => {
+      map.invalidateSize();
+      map.setView([lat, lng], 4);
+    });
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+      map.setView([lat, lng], 4);
+    }, 300);
+
     return () => {
+      clearTimeout(timer);
       map.remove();
       mapRef.current = null;
     };

@@ -56,12 +56,27 @@ const directChromiumScreenshot = async (url: string, chromePath: string): Promis
 };
 
 export const screenshotHandler: AnalysisHandler<ScreenshotResult> = async (url, options) => {
+  if (!url) {
+    return { error: 'URL is required', errorCode: 'INVALID_URL', errorCategory: 'tool' };
+  }
+
+  let targetUrl = url.trim();
+
+  // Block non-HTTP schemes before normalization
+  if (targetUrl.includes('://') && !targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+    return { error: `Blocked protocol: ${targetUrl.split('://')[0]}:`, errorCode: 'INVALID_URL', errorCategory: 'tool' };
+  }
+
+  if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+    targetUrl = 'https://' + targetUrl;
+  }
+
   // URL + SSRF validation before launching Chromium.
   let parsed: URL;
   try {
-    parsed = new URL(url);
+    parsed = new URL(targetUrl);
   } catch {
-    return { error: `Invalid URL: ${url}` };
+    return { error: `Invalid URL: ${url}`, errorCode: 'INVALID_URL', errorCategory: 'tool' };
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     return { error: `Blocked protocol: ${parsed.protocol}` };
@@ -73,25 +88,6 @@ export const screenshotHandler: AnalysisHandler<ScreenshotResult> = async (url, 
       return { error: `Blocked: target resolves to private address` };
     }
     throw e;
-  }
-
-  let targetUrl = url;
-
-  if (!targetUrl) {
-    return { error: 'URL is required', errorCode: 'INVALID_URL', errorCategory: 'tool' };
-  }
-
-  if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
-    targetUrl = 'http://' + targetUrl;
-  }
-
-  try {
-    const parsed2 = new URL(targetUrl);
-    if (parsed2.protocol !== 'http:' && parsed2.protocol !== 'https:') {
-      return { error: 'URL provided is invalid', errorCode: 'INVALID_URL', errorCategory: 'tool' };
-    }
-  } catch {
-    return { error: 'URL provided is invalid', errorCode: 'INVALID_URL', errorCategory: 'tool' };
   }
 
   if (targetUrl.includes('--')) {

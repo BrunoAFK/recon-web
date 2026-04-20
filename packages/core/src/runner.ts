@@ -1,7 +1,7 @@
 import pLimit from 'p-limit';
 import { registry, getHandlerNames } from './registry.js';
 import type { HandlerOptions, HandlerResult } from './types.js';
-import { extractHostname } from './utils/url.js';
+import { normalizeUrl, extractHostname } from './utils/url.js';
 import { assertPublicHost } from './utils/network.js';
 
 export interface RunOptions {
@@ -17,10 +17,11 @@ export interface RunOptions {
  * Returns a map of handler name → result.
  */
 export async function runHandlers(
-  url: string,
+  rawUrl: string,
   handlerOpts: HandlerOptions,
   runOpts?: RunOptions,
 ): Promise<Record<string, HandlerResult>> {
+  const url = normalizeUrl(rawUrl);
   const concurrency = runOpts?.concurrency ?? 8;
   const allNames = runOpts?.handlers ?? getHandlerNames();
   const limit = pLimit(concurrency);
