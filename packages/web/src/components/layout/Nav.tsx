@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { Globe, Clock, Palette, Check, Settings } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { Globe, Palette, Check, Settings } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 
 interface NavProps {
@@ -12,6 +12,14 @@ export default function Nav({ userMenu }: NavProps = {}) {
   const [showThemes, setShowThemes] = useState(false);
   const { theme, setTheme, themes } = useTheme();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const location = useLocation();
+
+  const seoActive = location.pathname.startsWith("/seo");
+  const generalActive =
+    location.pathname.startsWith("/recon")
+    || location.pathname.startsWith("/results")
+    || location.pathname === "/history"
+    || location.pathname.startsWith("/history/");
 
   // Close theme dropdown on click outside
   useEffect(() => {
@@ -28,21 +36,27 @@ export default function Nav({ userMenu }: NavProps = {}) {
   return (
     <nav className="border-b border-border/50 bg-surface/60 backdrop-blur-md sticky top-0 z-40">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-        <Link
-          to="/"
-          className="flex items-center gap-2.5 text-foreground hover:text-accent transition-colors"
-        >
-          <Globe className="h-5 w-5 text-accent" />
-          <span
-            className="text-lg font-bold tracking-tight"
-            style={{ fontFamily: "var(--font-display)" }}
+        <div className="flex items-center gap-4">
+          <Link
+            to="/"
+            className="flex items-center gap-2.5 text-foreground hover:text-accent transition-colors"
           >
-            recon-web
-          </span>
-        </Link>
+            <Globe className="h-5 w-5 text-accent" />
+            <span
+              className="text-lg font-bold tracking-tight"
+              style={{ fontFamily: "var(--font-display)" }}
+            >
+              recon-web
+            </span>
+          </Link>
+
+          <div className="flex items-center gap-1">
+            <ModuleLink to="/recon" label="Web Scan" active={generalActive} />
+            <ModuleLink to="/seo" label="SEO Crawler" active={seoActive} />
+          </div>
+        </div>
 
         <div className="flex items-center gap-1">
-          <NavLink to="/history" icon={Clock} label="History" />
           <NavLink to="/settings" icon={Settings} label="Settings" />
 
           {/* Theme switcher */}
@@ -105,6 +119,21 @@ export default function Nav({ userMenu }: NavProps = {}) {
         </div>
       </div>
     </nav>
+  );
+}
+
+function ModuleLink({ to, label, active }: { to: string; label: string; active: boolean }) {
+  return (
+    <Link
+      to={to}
+      className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+        active
+          ? "text-foreground bg-surface-light/60"
+          : "text-muted hover:text-foreground hover:bg-surface-light/40"
+      }`}
+    >
+      {label}
+    </Link>
   );
 }
 
